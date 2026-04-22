@@ -1,0 +1,224 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}/goals
+    // Document ID: goalId
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required, size < 100)
+    //   - description: string (optional, size < 500)
+    //   - category: string (required, enum: professional, personal, financial, health)
+    //   - targetDate: string (required)
+    //   - time: string (required)
+    //   - color: string (required)
+    //   - progress: number (required, 0-100)
+    //   - status: string (required, enum: active, completed, on-hold)
+    //   - tasks: list (required, items are maps)
+    //
+    // Collection: /users/{userId}/events
+    // Document ID: eventId
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required, size < 100)
+    //   - start: string (required, ISO)
+    //   - end: string (required, ISO)
+    //   - category: string (required)
+    //   - color: string (required)
+    //   - goalId: string (optional)
+    //   - completed: bool (optional)
+    //
+    // Collection: /users/{userId}/achievements
+    // Document ID: achievementId
+    // Fields:
+    //   - id: string (required)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - content: string (required, size < 1000)
+    //   - createdAt: string (required, ISO)
+    //   - type: string (optional, enum: manual, habit)
+    //
+    // Collection: /users/{userId}/habits
+    // Document ID: habitId
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required, size < 100)
+    //   - category: string (required, enum: personal, professional)
+    //   - completedDates: list (required, strings)
+    //   - acquired: bool (required)
+    //   - streak: number (required)
+    //
+    // Collection: /users/{userId}/notes
+    // Document ID: noteId
+    // Fields:
+    //   - id: string (required)
+    //   - content: string (required, size < 5000)
+    //   - createdAt: string (required, ISO)
+    //   - type: string (required, enum: text, voice)
+    //   - audioUrl: string (optional)
+    //
+    // Collection: /users/{userId}/settings
+    // Document ID: current
+    // Fields:
+    //   - categories: list (optional)
+    //   - theme: string (optional, enum: dark, light)
+    //   - defaultTab: string (optional)
+    //   - showHolidays: bool (optional)
+    //   - selectedCountry: string (optional)
+    //   - selectedRegion: string (optional)
+    //   - workEndNotify: bool (optional)
+    //   - workEndTime: string (optional)
+    //   - workEndDays: list (optional)
+    //
+    // Collection: /users/{userId}/googleAccounts
+    // Document ID: accountId
+    // Fields:
+    //   - id: string (required)
+    //   - email: string (required)
+    //   - accessToken: string (optional)
+    //   - refreshToken: string (optional)
+    //   - expiryDate: number (optional)
+    //   - isAuthorized: bool (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "promeom@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidGoal(data) {
+      return data.id is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.category in ['professional', 'personal', 'financial', 'health'] &&
+             data.targetDate is string &&
+             data.time is string &&
+             data.color is string &&
+             data.progress is number && data.progress >= 0 && data.progress <= 100 &&
+             data.status in ['active', 'completed', 'on-hold'] &&
+             data.tasks is list;
+    }
+
+    function isValidEvent(data) {
+      return data.id is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.start is string &&
+             data.end is string &&
+             data.category is string &&
+             data.color is string;
+    }
+
+    function isValidAchievement(data) {
+      return data.id is string &&
+             data.date is string &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 1000 &&
+             data.createdAt is string;
+    }
+
+    function isValidHabit(data) {
+      return data.id is string &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.category in ['personal', 'professional'] &&
+             data.completedDates is list &&
+             data.acquired is bool &&
+             data.streak is number;
+    }
+
+    function isValidNote(data) {
+      return data.id is string &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             data.createdAt is string &&
+             data.type in ['text', 'voice'];
+    }
+
+    function isValidSettings(data) {
+      return (!('theme' in data) || data.theme in ['dark', 'light']);
+    }
+
+    function isValidGoogleAccount(data) {
+      return data.id is string &&
+             data.email is string &&
+             (!('accessToken' in data) || data.accessToken is string) &&
+             (!('refreshToken' in data) || data.refreshToken is string) &&
+             (!('expiryDate' in data) || data.expiryDate is number) &&
+             data.isAuthorized is bool &&
+             (!('syncType' in data) || data.syncType in ['oauth', 'ical']) &&
+             (!('icalUrl' in data) || data.icalUrl is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+
+      match /goals/{goalId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidGoal(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /events/{eventId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidEvent(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /achievements/{achievementId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidAchievement(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /habits/{habitId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidHabit(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /notes/{noteId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidNote(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /settings/{settingId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidSettings(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /googleAccounts/{accountId} {
+        allow read, list: if isOwner(userId) || isAdmin();
+        allow create, update: if (isOwner(userId) || isAdmin()) && isValidGoogleAccount(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

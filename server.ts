@@ -12,7 +12,7 @@ import ical from 'node-ical';
 dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
 // Load Firebase config
 const firebaseConfig = JSON.parse(

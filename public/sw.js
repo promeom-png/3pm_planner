@@ -1,4 +1,4 @@
-const CACHE_NAME = 'planner-3pm-v2';
+const CACHE_NAME = 'planner-3pm-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

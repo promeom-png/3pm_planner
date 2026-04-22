@@ -19,9 +19,6 @@ COPY . .
 # Esto genera la carpeta 'dist'
 RUN npm run build
 
-# El puerto 3000 es el que usa Cloud Run por defecto en nuestra configuración
-EXPOSE 3000
-
 # Iniciamos la aplicación
 # Usamos el flag experimental para soporte nativo de TS en Node 22
 CMD ["node", "--experimental-strip-types", "server.ts"]

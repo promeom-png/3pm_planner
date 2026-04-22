@@ -12,7 +12,9 @@ import ical from 'node-ical';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+// En Cloud Run, Google inyecta el puerto en la variable PORT (suele ser 8080).
+// En AI Studio, necesitamos que sea el 3000.
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 // Load Firebase config
 const firebaseConfig = JSON.parse(

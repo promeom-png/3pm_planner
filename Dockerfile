@@ -12,6 +12,8 @@ COPY package*.json ./
 # Nota: Instalamos todas (incluyendo dev) para poder hacer el build de Vite
 RUN npm install
 
+ENV NODE_ENV=production
+
 # Copiamos el resto del código
 COPY . .
 

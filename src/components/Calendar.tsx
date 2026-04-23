@@ -130,46 +130,9 @@ export default function Calendar({
   const lastSnappedMinutesRef = React.useRef<number | null>(null);
   const [showDiscrepancyAlert, setShowDiscrepancyAlert] = useState(false);
   const [discrepancyMessage, setDiscrepancyMessage] = useState('');
-  const inactivityTimerRef = React.useRef<any>(null);
-
-  const startDeselectTimer = React.useCallback(() => {
-    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-    inactivityTimerRef.current = setTimeout(() => {
-      setSelectedEventId(null);
-      inactivityTimerRef.current = null;
-    }, 5000);
-  }, []);
-
-  const handlePointerUp = React.useCallback((isAuto = false) => {
-    const currentResizing = resizingEventRef.current;
-    const mode = interactionModeRef.current;
-    
-    if (currentResizing && onUpdateEvent && mode !== 'none') {
-      const originalEvent = events.find(ev => ev.id === currentResizing.id);
-      if (originalEvent) {
-        const newStart = currentResizing.start || originalEvent.start;
-        const newEnd = currentResizing.end || originalEvent.end;
-        
-        if (newStart !== originalEvent.start || newEnd !== originalEvent.end) {
-          onUpdateEvent({
-            ...originalEvent,
-            start: newStart,
-            end: newEnd
-          });
-          if (window.navigator.vibrate) window.navigator.vibrate(20);
-        }
-      }
-    }
-    updateResizingEvent(null);
-    setMode('none');
-    lastSnappedMinutesRef.current = null;
-
-    if (isAuto) {
-      setSelectedEventId(null);
-    } else {
-      startDeselectTimer();
-    }
-  }, [events, onUpdateEvent, startDeselectTimer]);
+  const [inactivityTimerRef, setInactivityTimerRef] = useState<any>(null);
+  const [showGuideLine, setShowGuideLine] = useState(false);
+  const guideInactivityTimerRef = React.useRef<any>(null);
 
   const startHour = workDayStart;
   const endHour = workDayEnd;
@@ -178,12 +141,50 @@ export default function Calendar({
   const setMode = (mode: 'none' | 'moving' | 'resizing-top' | 'resizing-bottom') => {
     setInteractionMode(mode);
     interactionModeRef.current = mode;
+    if (mode !== 'none') {
+      setShowGuideLine(true);
+      resetGuideTimer();
+    } else {
+      setShowGuideLine(false);
+      if (guideInactivityTimerRef.current) clearTimeout(guideInactivityTimerRef.current);
+    }
+  };
+
+  const resetGuideTimer = () => {
+    if (guideInactivityTimerRef.current) clearTimeout(guideInactivityTimerRef.current);
+    guideInactivityTimerRef.current = setTimeout(() => {
+      setShowGuideLine(false);
+    }, 2500); // 2.5 seconds timeout
   };
 
   const updateResizingEvent = (data: { id: string, start?: string, end?: string } | null) => {
     setResizingEvent(data);
     resizingEventRef.current = data;
+    if (data) resetGuideTimer();
   };
+
+  // Orientation logic for Week View
+  useEffect(() => {
+    if (view === 'week' && window.innerWidth < 768) {
+      const lockOrientation = async () => {
+        try {
+          if (screen.orientation && (screen.orientation as any).lock) {
+            await (screen.orientation as any).lock('landscape');
+          }
+        } catch (e) {
+          console.warn('Orientation lock not supported or blocked');
+        }
+      };
+      lockOrientation();
+    }
+    return () => {
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+      } catch (e) {}
+    };
+  }, [view]);
 
   // Global pointer listeners for precision interaction
   useEffect(() => {
@@ -388,16 +389,25 @@ export default function Calendar({
         setFormDate(format(date, 'yyyy-MM-dd'));
         setSelectedDate(date);
       }
+      
+      let initialTime = format(new Date(), 'HH:mm');
       if (time) {
-        setFormTime(time);
+        // Round to nearest 15 mins for new events
         const [h, m] = time.split(':').map(Number);
-        const endDate = new Date();
-        endDate.setHours(h, m + 60);
-        setFormEndTime(format(endDate, 'HH:mm'));
+        const snappedMin = Math.round(m / 15) * 15;
+        initialTime = `${h.toString().padStart(2, '0')}:${(snappedMin % 60).toString().padStart(2, '0')}`;
       } else {
-        setFormTime(format(new Date(), 'HH:mm'));
-        setFormEndTime(format(addMinutes(new Date(), 60), 'HH:mm'));
+        const now = new Date();
+        const snappedMin = Math.round(now.getMinutes() / 15) * 15;
+        now.setMinutes(snappedMin % 60);
+        initialTime = format(now, 'HH:mm');
       }
+      
+      setFormTime(initialTime);
+      const [h, m] = initialTime.split(':').map(Number);
+      const endDate = new Date();
+      endDate.setHours(h, m + 60);
+      setFormEndTime(format(endDate, 'HH:mm'));
     }
     setIsModalOpen(true);
   };
@@ -701,7 +711,7 @@ export default function Calendar({
         "flex-1 p-1 overflow-hidden",
         theme === 'dark' ? "bg-black" : "bg-[#f5f5f0]"
       )}>
-        <div className="grid grid-cols-2 grid-rows-4 gap-1 h-full">
+        <div className="grid grid-cols-2 grid-rows-4 gap-1 h-full max-h-full">
           {/* 7 Days Boxes */}
           {weekDays.map((day) => {
             const dayEvents = getEventsForDay(day)
@@ -715,7 +725,7 @@ export default function Calendar({
                 key={day.toString()} 
                 onClick={() => openEventModal(day)}
                 className={cn(
-                  "rounded-xl p-2 border flex flex-col overflow-hidden transition-all",
+                  "rounded-xl p-2 border flex flex-col overflow-hidden transition-all h-full",
                   theme === 'dark' 
                     ? (holidays.length > 0 ? "bg-[#228B22]/10 border-[#228B22]/30" : "bg-zinc-950 border-zinc-900") 
                     : (holidays.length > 0 ? "bg-[#228B22]/5 border-[#228B22]/20" : "bg-white border-zinc-200 shadow-sm")
@@ -999,19 +1009,19 @@ export default function Calendar({
             ref={dayViewContainerRef} 
             onClick={() => setSelectedEventId(null)}
           >
-            <div className="flex flex-col h-full relative">
+            <div className="flex flex-col h-full relative" style={{ minHeight: `${totalHours * 40}px` }}>
               {hours.map((hour) => (
                 <div 
                   key={hour} 
                   className={cn(
-                    "flex-1 border-b flex items-start gap-3 relative", // Removed min-h-[48px]
+                    "flex-1 border-b flex items-start gap-1 relative",
                     theme === 'dark' ? "border-zinc-900/50" : "border-zinc-200/50"
                   )}
                   onClick={() => openEventModal(currentDate, `${hour.toString().padStart(2, '0')}:00`)}
                 >
                   <span className={cn(
-                    "text-[14px] w-8 font-mono -translate-y-1/2",
-                    theme === 'dark' ? "text-white" : "text-zinc-400"
+                    "text-[12px] w-7 font-mono -translate-y-1/2 shrink-0 text-center",
+                    theme === 'dark' ? "text-white/60" : "text-zinc-400"
                   )}>{hour.toString().padStart(2, '0')}:00</span>
                   <div className="flex-1 h-full" />
                 </div>
@@ -1019,7 +1029,7 @@ export default function Calendar({
 
             {/* Visual Guide Line */}
             <AnimatePresence>
-              {interactionMode !== 'none' && resizingEvent && (
+              {showGuideLine && resizingEvent && (
                 <motion.div 
                   initial={{ opacity: 0, scaleX: 0 }}
                   animate={{ opacity: 1, scaleX: 1 }}
@@ -1156,7 +1166,7 @@ export default function Calendar({
           <div className="flex-1" />
 
           {/* Icons in lower half */}
-          <div className="flex flex-col gap-3 mb-4">
+          <div className="flex flex-col gap-3 mb-12">
             <button 
               onClick={() => setIsHabitsModalOpen(true)}
               className={cn(
@@ -1170,7 +1180,7 @@ export default function Calendar({
                 <Settings className="w-2.5 h-2.5 absolute -top-1 -right-1" />
                 <Settings className="w-2.5 h-2.5 absolute -bottom-1 -left-1" />
               </div>
-              <span className="text-[12px] font-bold uppercase tracking-tighter opacity-70">Hábitos</span>
+              <span className="text-[11px] font-bold uppercase tracking-tighter opacity-70">Hábitos</span>
             </button>
 
             <button 
@@ -1182,7 +1192,7 @@ export default function Calendar({
               title="Cierre del Día"
             >
               <Key className="w-4 h-4" />
-              <span className="text-[12px] font-bold uppercase tracking-tighter opacity-70">Cierre</span>
+              <span className="text-[11px] font-bold uppercase tracking-tighter opacity-70">Cierre</span>
             </button>
           </div>
         </div>
@@ -1308,7 +1318,22 @@ export default function Calendar({
       </div>
 
       {/* Swipeable Content */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className={cn(
+        "flex-1 relative overflow-hidden",
+        view === 'week' && "orient-week-view"
+      )}>
+        {view === 'week' && (
+          <div className="absolute top-4 right-4 z-50 md:hidden animate-pulse">
+            <motion.div 
+              initial={{ rotate: 0 }}
+              animate={{ rotate: 90 }}
+              transition={{ repeat: Infinity, duration: 2, repeatDelay: 1 }}
+              className="bg-primary/20 p-2 rounded-lg backdrop-blur-sm border border-primary/30"
+            >
+              <Columns className="w-4 h-4 text-primary" />
+            </motion.div>
+          </div>
+        )}
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={`${view}-${currentDate.toISOString()}`}
@@ -1615,7 +1640,7 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
-                                          setFormTime(`${String(h).padStart(2, '0')}:${String((m + 5) % 60).padStart(2, '0')}`);
+                                          setFormTime(`${String(h).padStart(2, '0')}:${String((m + 15) % 60).padStart(2, '0')}`);
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1626,7 +1651,7 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
-                                          setFormTime(`${String(h).padStart(2, '0')}:${String((m - 5 + 60) % 60).padStart(2, '0')}`);
+                                          setFormTime(`${String(h).padStart(2, '0')}:${String((m - 15 + 60) % 60).padStart(2, '0')}`);
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1675,7 +1700,7 @@ export default function Calendar({
                                   animate={{ opacity: 1, scale: 1, y: 0 }}
                                   exit={{ opacity: 0, scale: 0.95, y: 10 }}
                                   className={cn(
-                                    "absolute z-[110] top-full left-0 mt-2 p-4 rounded-2xl border shadow-2xl flex flex-col gap-4 min-w-[200px]",
+                                    "absolute z-[110] top-full right-0 mt-2 p-4 rounded-2xl border shadow-2xl flex flex-col gap-4 min-w-[200px]",
                                     theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                                   )}
                                 >
@@ -1709,7 +1734,7 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
-                                          setFormEndTime(`${String(h).padStart(2, '0')}:${String((m + 5) % 60).padStart(2, '0')}`);
+                                          setFormEndTime(`${String(h).padStart(2, '0')}:${String((m + 15) % 60).padStart(2, '0')}`);
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1720,7 +1745,7 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
-                                          setFormEndTime(`${String(h).padStart(2, '0')}:${String((m - 5 + 60) % 60).padStart(2, '0')}`);
+                                          setFormEndTime(`${String(h).padStart(2, '0')}:${String((m - 15 + 60) % 60).padStart(2, '0')}`);
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1894,15 +1919,15 @@ export default function Calendar({
                       </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 pb-2">
                       <label className="text-[16px] font-black text-zinc-500 uppercase tracking-widest">Categoría</label>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-5 gap-2 px-1">
                         {CLIENT_COLORS.map(color => (
                           <button
                             key={color}
                             onClick={() => setFormColor(color)}
                             className={cn(
-                              "w-7 h-7 rounded-full transition-transform active:scale-75",
+                              "w-7 h-7 rounded-full transition-transform active:scale-75 mx-auto",
                               formColor === color 
                                 ? (theme === 'dark' ? "ring-2 ring-white ring-offset-2 ring-offset-zinc-900 scale-110" : "ring-2 ring-black ring-offset-2 ring-offset-white scale-110") 
                                 : "opacity-60"

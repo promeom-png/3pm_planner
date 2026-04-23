@@ -176,6 +176,24 @@ export default function Calendar({
     }
   };
 
+  const handlePointerUp = (cancelled: boolean = false) => {
+    if (interactionModeRef.current !== 'none') {
+      if (!cancelled && resizingEventRef.current && onUpdateEvent) {
+        const event = events.find(ev => ev.id === resizingEventRef.current!.id);
+        if (event) {
+          const updatedEvent = {
+            ...event,
+            start: resizingEventRef.current!.start || event.start,
+            end: resizingEventRef.current!.end || event.end
+          };
+          onUpdateEvent(updatedEvent);
+        }
+      }
+      setMode('none');
+      updateResizingEvent(null);
+    }
+  };
+
   const resetGuideTimer = () => {
     if (guideInactivityTimerRef.current) clearTimeout(guideInactivityTimerRef.current);
     guideInactivityTimerRef.current = setTimeout(() => {
@@ -188,29 +206,6 @@ export default function Calendar({
     resizingEventRef.current = data;
     if (data) resetGuideTimer();
   };
-
-  // Orientation logic for Week View
-  useEffect(() => {
-    if (view === 'week' && window.innerWidth < 768) {
-      const lockOrientation = async () => {
-        try {
-          if (screen.orientation && (screen.orientation as any).lock) {
-            await (screen.orientation as any).lock('landscape');
-          }
-        } catch (e) {
-          console.warn('Orientation lock not supported or blocked');
-        }
-      };
-      lockOrientation();
-    }
-    return () => {
-      try {
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
-      } catch (e) {}
-    };
-  }, [view]);
 
   // Global pointer listeners for precision interaction
   useEffect(() => {
@@ -1346,22 +1341,7 @@ export default function Calendar({
       </div>
 
       {/* Swipeable Content */}
-      <div className={cn(
-        "flex-1 relative overflow-hidden",
-        view === 'week' && "orient-week-view"
-      )}>
-        {view === 'week' && (
-          <div className="absolute top-4 right-4 z-50 md:hidden animate-pulse">
-            <motion.div 
-              initial={{ rotate: 0 }}
-              animate={{ rotate: 90 }}
-              transition={{ repeat: Infinity, duration: 2, repeatDelay: 1 }}
-              className="bg-primary/20 p-2 rounded-lg backdrop-blur-sm border border-primary/30"
-            >
-              <Columns className="w-4 h-4 text-primary" />
-            </motion.div>
-          </div>
-        )}
+      <div className="flex-1 relative overflow-hidden">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
             key={`${view}-${currentDate.toISOString()}`}

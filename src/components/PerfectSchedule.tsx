@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, RotateCcw, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Save, RotateCcw, Info, ChevronLeft, ChevronRight, Columns } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PerfectSchedule, Category, PerfectScheduleSlot } from '../types';
 import { cn, getContrastColor } from '../lib/utils';
@@ -42,6 +42,28 @@ export default function PerfectScheduleView({
   }, [schedule]);
 
   useEffect(() => {
+    if (isOpen && window.innerWidth < 768) {
+      const lockOrientation = async () => {
+        try {
+          if (screen.orientation && (screen.orientation as any).lock) {
+            await (screen.orientation as any).lock('landscape');
+          }
+        } catch (e) {
+          console.warn('Orientation lock not supported or blocked');
+        }
+      };
+      lockOrientation();
+    }
+    return () => {
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
+      } catch (e) {}
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     const handleResize = () => {
       setIsPortrait(window.innerHeight > window.innerWidth);
     };
@@ -82,6 +104,18 @@ export default function PerfectScheduleView({
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-md flex flex-col"
       >
+        {/* Rotation indicator for mobile */}
+        <div className="absolute top-20 right-4 z-[310] md:hidden animate-pulse pointer-events-none">
+          <motion.div 
+            initial={{ rotate: 0 }}
+            animate={{ rotate: 90 }}
+            transition={{ repeat: Infinity, duration: 2, repeatDelay: 1 }}
+            className="bg-primary/20 p-2 rounded-lg backdrop-blur-sm border border-primary/30"
+          >
+            <Columns className="w-5 h-5 text-primary" />
+          </motion.div>
+        </div>
+
         {/* Header */}
         <div className={cn(
           "flex items-center justify-between px-4 py-2 border-b shrink-0",

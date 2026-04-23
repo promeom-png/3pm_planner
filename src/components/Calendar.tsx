@@ -160,9 +160,14 @@ export default function Calendar({
     }, 5000); // 5 seconds
   };
 
-  const startHour = workDayStart;
-  const endHour = workDayEnd;
-  const totalHours = endHour - startHour + 1;
+  // Double check robustness
+  if (!(currentDate instanceof Date) || isNaN(currentDate.getTime())) {
+    return <div className="flex-1 flex items-center justify-center p-4">Error: Fecha inválida. Por favor, recarga la página.</div>;
+  }
+
+  const startHour = workDayStart ?? 7;
+  const endHour = workDayEnd ?? 23;
+  const totalHours = Math.max(1, endHour - startHour + 1);
 
   const setMode = (mode: 'none' | 'moving' | 'resizing-top' | 'resizing-bottom') => {
     setInteractionMode(mode);
@@ -667,7 +672,7 @@ export default function Calendar({
                 )}
               >
                 <div className="flex flex-wrap gap-0.5 justify-center overflow-hidden mb-0.5">
-                  {habits.filter(h => h.completedDates.includes(format(day, 'yyyy-MM-dd'))).slice(0, 4).map(habit => (
+                  {(habits || []).filter(h => (h.completedDates || []).includes(format(day, 'yyyy-MM-dd'))).slice(0, 4).map(habit => (
                     <div 
                       key={habit.id}
                       title={habit.title}
@@ -795,9 +800,9 @@ export default function Calendar({
                   )}
 
                   {/* Habits in Week View */}
-                  {habits.filter(h => h.completedDates.includes(format(day, 'yyyy-MM-dd'))).length > 0 && (
+                  {(habits || []).filter(h => (h.completedDates || []).includes(format(day, 'yyyy-MM-dd'))).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      {habits.filter(h => h.completedDates.includes(format(day, 'yyyy-MM-dd'))).map(habit => (
+                      {(habits || []).filter(h => (h.completedDates || []).includes(format(day, 'yyyy-MM-dd'))).map(habit => (
                         <div 
                           key={habit.id}
                           title={habit.title}
@@ -879,7 +884,7 @@ export default function Calendar({
                   >
                     {format(day, 'd')}
                     <div className="absolute -bottom-0.5 left-0 right-0 flex justify-center gap-0.5">
-                      {habits.filter(h => h.completedDates.includes(format(day, 'yyyy-MM-dd'))).slice(0, 3).map(habit => (
+                      {(habits || []).filter(h => (h.completedDates || []).includes(format(day, 'yyyy-MM-dd'))).slice(0, 3).map(habit => (
                         <div 
                           key={habit.id}
                           className={cn(
@@ -1050,30 +1055,54 @@ export default function Calendar({
                 </div>
               ))}
 
-            {/* Visual Guide Line */}
-            <AnimatePresence>
-              {showGuideLine && resizingEvent && (
-                <motion.div 
-                  initial={{ opacity: 0, scaleX: 0 }}
-                  animate={{ opacity: 1, scaleX: 1 }}
-                  exit={{ opacity: 0, scaleX: 0 }}
-                  className="absolute left-0 right-0 border-t-2 border-dashed border-primary/50 z-[110] pointer-events-none flex items-center justify-start"
-                  style={{ 
-                    top: (interactionMode === 'resizing-bottom') 
-                      ? `${(differenceInMinutes(parseISO(resizingEvent.end || events.find(e => e.id === resizingEvent.id)!.end), startOfDay(currentDate).setHours(startHour)) / (totalHours * 60)) * 100}%`
-                      : `${(differenceInMinutes(parseISO(resizingEvent.start || events.find(e => e.id === resizingEvent.id)!.start), startOfDay(currentDate).setHours(startHour)) / (totalHours * 60)) * 100}%`
-                  }}
-                >
-                  <span className="bg-primary text-primary-foreground text-[16px] w-12 py-1 rounded-r-lg shadow-lg font-bold -translate-y-1/2 flex items-center justify-center">
-                    {format(parseISO(
-                      (interactionMode === 'resizing-bottom') 
-                        ? (resizingEvent.end || events.find(e => e.id === resizingEvent.id)!.end)
-                        : (resizingEvent.start || events.find(e => e.id === resizingEvent.id)!.start)
-                    ), 'HH:mm')}
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
+      {/* Visual Guide Line */}
+      <AnimatePresence>
+        {showGuideLine && resizingEvent && (
+          <motion.div 
+            initial={{ opacity: 0, scaleX: 0 }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            exit={{ opacity: 0, scaleX: 0 }}
+            className="absolute left-0 right-0 border-t-2 border-dashed border-primary/50 z-[110] pointer-events-none flex items-center justify-start"
+            style={{ 
+              top: (() => {
+                const event = events.find(e => e.id === resizingEvent.id);
+                if (!event) return '0%';
+                
+                const timeStr = (interactionMode === 'resizing-bottom') 
+                  ? (resizingEvent.end || event.end)
+                  : (resizingEvent.start || event.start);
+                
+                try {
+                  const date = parseISO(timeStr);
+                  if (isNaN(date.getTime())) return '0%';
+                  const baseDate = startOfDay(currentDate);
+                  baseDate.setHours(startHour, 0, 0, 0);
+                  const diff = differenceInMinutes(date, baseDate);
+                  return `${(diff / (totalHours * 60)) * 100}%`;
+                } catch(e) {
+                  return '0%';
+                }
+              })()
+            }}
+          >
+            <span className="bg-primary text-primary-foreground text-[16px] w-12 py-1 rounded-r-lg shadow-lg font-bold -translate-y-1/2 flex items-center justify-center">
+              {(() => {
+                const event = events.find(e => e.id === resizingEvent.id);
+                if (!event) return '--:--';
+                const timeStr = (interactionMode === 'resizing-bottom') 
+                  ? (resizingEvent.end || event.end)
+                  : (resizingEvent.start || event.start);
+                try {
+                  const date = parseISO(timeStr);
+                  return isNaN(date.getTime()) ? '--:--' : format(date, 'HH:mm');
+                } catch(e) {
+                  return '--:--';
+                }
+              })()}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
         {regularEvents.map(event => {
             const isResizing = resizingEvent?.id === event.id;
@@ -1136,19 +1165,19 @@ export default function Calendar({
           "w-20 border-l flex flex-col items-center py-4 px-2 text-center relative overflow-hidden",
           theme === 'dark' ? "border-zinc-900 bg-zinc-950" : "border-zinc-200 bg-white"
         )}>
-          {/* Habit Dots at the top (Vertical) */}
-          <div className="flex flex-col gap-1 mb-2">
-            {habits.filter(h => h.completedDates.includes(format(currentDate, 'yyyy-MM-dd'))).slice(0, 6).map(habit => (
-              <div 
-                key={habit.id}
-                title={habit.title}
-                className={cn(
-                  "w-2.5 h-2.5 rounded-full shadow-sm border border-black/10",
-                  habit.category === 'professional' ? "bg-blue-500" : "bg-[#228B22]"
-                )}
-              />
-            ))}
-          </div>
+            {/* Habit Dots at the top (Vertical) */}
+            <div className="flex flex-col gap-1 mb-2">
+              {(habits || []).filter(h => (h.completedDates || []).includes(format(currentDate, 'yyyy-MM-dd'))).slice(0, 6).map(habit => (
+                <div 
+                  key={habit.id}
+                  title={habit.title}
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-full shadow-sm border border-black/10",
+                    habit.category === 'professional' ? "bg-blue-500" : "bg-[#228B22]"
+                  )}
+                />
+              ))}
+            </div>
           
           <div className="flex-1" />
 
@@ -1223,6 +1252,7 @@ export default function Calendar({
     );
   };
 
+  try {
   return (
     <div className={cn(
       "flex flex-col h-full relative",
@@ -1344,7 +1374,7 @@ export default function Calendar({
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence initial={false} mode="popLayout">
           <motion.div
-            key={`${view}-${currentDate.toISOString()}`}
+            key={`${view}-${currentDate instanceof Date && !isNaN(currentDate.getTime()) ? currentDate.toISOString() : 'default'}`}
             initial={{ x: direction * 100, y: directionY * 100, opacity: 0 }}
             animate={{ x: 0, y: 0, opacity: 1 }}
             exit={{ x: -direction * 100, y: -directionY * 100, opacity: 0 }}
@@ -1995,6 +2025,29 @@ export default function Calendar({
       </AnimatePresence>
     </div>
   );
+  } catch (err) {
+    console.error("Calendar crash:", err);
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8 text-red-500" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold">Algo salió mal</h2>
+          <p className="text-zinc-500">Hubo un error al renderizar el calendario.</p>
+          <div className="p-4 bg-zinc-900 rounded-xl text-left font-mono text-xs text-zinc-400 overflow-auto max-w-md">
+            {err instanceof Error ? err.message : String(err)}
+          </div>
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 bg-[#228B22] text-white rounded-xl font-bold"
+        >
+          Recargar Página
+        </button>
+      </div>
+    );
+  }
 }
 
 interface EventComponentProps {

@@ -1,5 +1,6 @@
 {
-  "name": "promeom_3pm",
+  "name": "planner_3pm",
   "description": "Agenda de uso personal y privado con respaldo en la nube para el usuario 003.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }

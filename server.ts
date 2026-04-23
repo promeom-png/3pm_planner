@@ -234,10 +234,16 @@ if (process.env.NODE_ENV !== "production") {
   const distPath = path.join(process.cwd(), 'dist');
   
   // Serve Service Worker and Manifest directly to avoid SPA fallback redirects
-  app.get("/sw.js", (req, res) => {
+  app.get(["/sw.js", "/service-worker.js"], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Service-Worker-Allowed', '/');
     res.sendFile(path.join(distPath, "sw.js"));
   });
+
   app.get("/manifest.json", (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Content-Type', 'application/manifest+json');
     res.sendFile(path.join(distPath, "manifest.json"));
   });
 

@@ -22,9 +22,12 @@
       
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          // Add version query string to bypass redirects/cache on script fetch
+          const swUrl = '/sw.js?v=' + new Date().getTime();
+          navigator.serviceWorker.register(swUrl)
             .then(reg => {
               console.log('Service Worker registrado con éxito');
+              // Force update manually
               reg.update();
             })
             .catch(err => console.log('Error al registrar Service Worker', err));

@@ -1254,9 +1254,9 @@ export default function Calendar({
 
   return (
     <div className={cn(
-      "flex flex-col h-full relative",
+      "flex flex-col flex-1",
       theme === 'dark' ? "bg-black" : "bg-[#f5f5f0]"
-    )}>
+    )} style={{ height: '100dvh', minHeight: '-webkit-fill-available', position: 'relative' }}>
       {/* Discrepancy Alert */}
       <AnimatePresence>
         {showDiscrepancyAlert && (

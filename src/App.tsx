@@ -193,10 +193,15 @@ export default function App() {
         if (data.workEndDays) setWorkEndDays(data.workEndDays);
         if (data.perfectSchedule) setPerfectSchedule(data.perfectSchedule);
       }
-      setIsLoaded(true);
+      // Add a small delay to ensure UI is ready for specialized mobile views
+      setTimeout(() => {
+        setIsLoaded(true);
+      }, 500);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, `${userPath}/settings/current`);
-      setIsLoaded(true); // Still set to true on error to allow app to function
+      setTimeout(() => {
+        setIsLoaded(true);
+      }, 500);
     });
 
     return () => {

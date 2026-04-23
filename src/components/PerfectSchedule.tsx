@@ -42,25 +42,7 @@ export default function PerfectScheduleView({
   }, [schedule]);
 
   useEffect(() => {
-    if (isOpen && window.innerWidth < 768) {
-      const lockOrientation = async () => {
-        try {
-          if (screen.orientation && (screen.orientation as any).lock) {
-            await (screen.orientation as any).lock('landscape');
-          }
-        } catch (e) {
-          console.warn('Orientation lock not supported or blocked');
-        }
-      };
-      lockOrientation();
-    }
-    return () => {
-      try {
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
-      } catch (e) {}
-    };
+    // Orientation lock removed for better stability
   }, [isOpen]);
 
   useEffect(() => {

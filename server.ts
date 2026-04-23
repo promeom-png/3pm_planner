@@ -232,6 +232,15 @@ if (process.env.NODE_ENV !== "production") {
   app.use(vite.middlewares);
 } else {
   const distPath = path.join(process.cwd(), 'dist');
+  
+  // Serve Service Worker and Manifest directly to avoid SPA fallback redirects
+  app.get("/sw.js", (req, res) => {
+    res.sendFile(path.join(distPath, "sw.js"));
+  });
+  app.get("/manifest.json", (req, res) => {
+    res.sendFile(path.join(distPath, "manifest.json"));
+  });
+
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));

@@ -743,7 +743,7 @@ export default function Calendar({
           {/* 7 Days Boxes */}
           {weekDays.map((day) => {
             const dayEvents = getEventsForDay(day)
-              .sort((a, b) => a.start.localeCompare(b.start));
+              .sort((a, b) => (a.start || "").localeCompare(b.start || ""));
             
             const holidays = dayEvents.filter(e => e.category === 'holiday');
             const regularEvents = dayEvents.filter(e => e.category !== 'holiday');
@@ -1252,7 +1252,6 @@ export default function Calendar({
     );
   };
 
-  try {
   return (
     <div className={cn(
       "flex flex-col h-full relative",
@@ -1372,25 +1371,11 @@ export default function Calendar({
 
       {/* Swipeable Content */}
       <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence initial={false} mode="popLayout">
-          <motion.div
-            key={`${view}-${currentDate instanceof Date && !isNaN(currentDate.getTime()) ? currentDate.toISOString() : 'default'}`}
-            initial={{ x: direction * 100, y: directionY * 100, opacity: 0 }}
-            animate={{ x: 0, y: 0, opacity: 1 }}
-            exit={{ x: -direction * 100, y: -directionY * 100, opacity: 0 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            drag={interactionMode === 'none' && selectedEventId === null}
-            dragDirectionLock
-            dragElastic={0.15}
-            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-            onDragEnd={(_, info) => handleSwipe(info.offset.x, info.offset.y, info.velocity.x, info.velocity.y)}
-            className="h-full w-full"
-          >
-            {view === 'month' && renderMonthView()}
-            {view === 'week' && renderWeekView()}
-            {view === 'day' && renderDayView()}
-          </motion.div>
-        </AnimatePresence>
+        <div className="h-full w-full">
+          {view === 'month' && renderMonthView()}
+          {view === 'week' && renderWeekView()}
+          {view === 'day' && renderDayView()}
+        </div>
       </div>
 
       {/* Habits Modal */}
@@ -2025,29 +2010,6 @@ export default function Calendar({
       </AnimatePresence>
     </div>
   );
-  } catch (err) {
-    console.error("Calendar crash:", err);
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-          <AlertTriangle className="w-8 h-8 text-red-500" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-xl font-bold">Algo salió mal</h2>
-          <p className="text-zinc-500">Hubo un error al renderizar el calendario.</p>
-          <div className="p-4 bg-zinc-900 rounded-xl text-left font-mono text-xs text-zinc-400 overflow-auto max-w-md">
-            {err instanceof Error ? err.message : String(err)}
-          </div>
-        </div>
-        <button 
-          onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-[#228B22] text-white rounded-xl font-bold"
-        >
-          Recargar Página
-        </button>
-      </div>
-    );
-  }
 }
 
 interface EventComponentProps {

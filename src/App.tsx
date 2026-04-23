@@ -980,7 +980,7 @@ export default function App() {
       ...events,
       ...googleEvents,
       ...holidayEvents,
-    ];
+    ].filter(e => e && e.start && typeof e.start === 'string');
 
     const taskEvents = goals.flatMap(goal => 
       (goal.tasks || [])
@@ -1014,7 +1014,7 @@ export default function App() {
     );
 
     return [...baseEvents, ...taskEvents];
-  }, [events, holidayEvents, goals]);
+  }, [events, googleEvents, holidayEvents, goals]);
 
   const calculateAlignmentScore = useCallback(() => {
     if (!perfectSchedule || Object.keys(perfectSchedule.slots).length === 0) return 0;
@@ -1328,48 +1328,35 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Content Area */}
         <div className="flex-1 overflow-hidden">
-          <AnimatePresence mode="wait">
-            {activeTab === 'calendar' && (
-              <motion.div
-                key="calendar"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="h-full"
-              >
-                <Calendar 
-                  events={allEvents} 
-                  goals={goals.filter(g => g.status === 'active')}
-                  habits={habits}
-                  onAddEvent={handleAddEvent} 
-                  onUpdateEvent={handleUpdateEvent}
-                  onDeleteEvent={handleDeleteEvent}
-                  onToggleHabitCompletion={toggleHabitCompletion}
-                  onToggleHabitAcquired={toggleHabitAcquired}
-                  onDayClosure={() => setShowDayClosure(true)}
-                  workDayStart={workDayStart}
-                  workDayEnd={workDayEnd}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  theme={theme}
-                  onShowTutorial={() => setShowTutorial(true)}
-                  perfectSchedule={perfectSchedule}
-                  categories={categories}
-                />
-              </motion.div>
-            )}
-            {activeTab === 'goals' && (
-              <motion.div
-                key="goals"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="h-full flex flex-col"
-              >
-                <div className={cn(
-                  "flex items-center justify-between px-4 py-2 border-b",
-                  theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
-                )}>
+          {activeTab === 'calendar' && (
+            <div key="calendar" className="h-full">
+              <Calendar 
+                events={allEvents} 
+                goals={goals.filter(g => g.status === 'active')}
+                habits={habits}
+                onAddEvent={handleAddEvent} 
+                onUpdateEvent={handleUpdateEvent}
+                onDeleteEvent={handleDeleteEvent}
+                onToggleHabitCompletion={toggleHabitCompletion}
+                onToggleHabitAcquired={toggleHabitAcquired}
+                onDayClosure={() => setShowDayClosure(true)}
+                workDayStart={workDayStart}
+                workDayEnd={workDayEnd}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                theme={theme}
+                onShowTutorial={() => setShowTutorial(true)}
+                perfectSchedule={perfectSchedule}
+                categories={categories}
+              />
+            </div>
+          )}
+          {activeTab === 'goals' && (
+            <div key="goals" className="h-full flex flex-col">
+              <div className={cn(
+                "flex items-center justify-between px-4 py-2 border-b",
+                theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
+              )}>
                   <div className="flex items-center gap-2">
                     <h2 className={cn(
                       "text-xs font-bold capitalize",
@@ -1421,16 +1408,10 @@ export default function App() {
                     onShowTutorial={() => setShowTutorial(true)}
                   />
                 </div>
-              </motion.div>
+              </div>
             )}
             {activeTab === 'notes' && (
-              <motion.div
-                key="notes"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="h-full flex flex-col"
-              >
+              <div key="notes" className="h-full flex flex-col">
                 <div className={cn(
                   "flex items-center justify-between px-4 py-2 border-b",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
@@ -1529,14 +1510,11 @@ export default function App() {
                     theme={theme}
                   />
                 </div>
-              </motion.div>
+              </div>
             )}
             {activeTab === 'settings' && (
-              <motion.div
+              <div
                 key="settings"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
                 className="h-full flex flex-col"
               >
                 <div className={cn(
@@ -2085,16 +2063,10 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              </motion.div>
-            )}
+            </div>
+          )}
             {activeTab === 'dashboard' && (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="h-full flex flex-col"
-              >
+              <div key="dashboard" className="h-full flex flex-col">
                 <div className={cn(
                   "flex items-center justify-between px-4 py-2 border-b",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
@@ -2234,66 +2206,11 @@ export default function App() {
                         )}
                       </div>
                     </div>
-                    <div className={cn(
-                      "p-5 rounded-2xl border shadow-xl flex flex-col h-[300px]",
-                      theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                    )}>
-                      <h3 className="font-bold text-zinc-500 mb-4 text-[15px] uppercase tracking-widest">Logros</h3>
-                      <div 
-                        ref={achievementsRef}
-                        className="flex-1 overflow-y-auto pr-2 custom-scrollbar"
-                      >
-                        <div className="flex flex-col gap-3">
-                          {[
-                            ...dayAchievements.map(a => ({
-                              id: a.id,
-                              date: a.date,
-                              content: a.content,
-                              timestamp: new Date(a.createdAt).getTime(),
-                              type: 'achievement'
-                            })),
-                            ...events.filter(e => e.completed).map(e => ({
-                              id: e.id,
-                              date: format(parseISO(e.start), 'yyyy-MM-dd'),
-                              content: e.title,
-                              timestamp: new Date(e.start).getTime(),
-                              type: 'event'
-                            })),
-                            ...goals.flatMap(g => g.tasks).filter(t => t.completed).map(t => ({
-                              id: t.id,
-                              date: t.date || format(new Date(), 'yyyy-MM-dd'),
-                              content: t.title,
-                              timestamp: t.date ? new Date(t.date).getTime() : new Date().getTime(),
-                              type: 'task'
-                            }))
-                          ]
-                          .sort((a, b) => b.timestamp - a.timestamp)
-                          .map((item, idx) => (
-                            <div key={`${item.id}-${idx}`} className="flex items-start gap-2">
-                              <span className="text-[16px] font-mono text-zinc-500 shrink-0 mt-0.5">
-                                {format(parseISO(item.date), 'dd/MM')}
-                              </span>
-                              <p className={cn(
-                                "text-[15px] leading-relaxed line-clamp-2",
-                                theme === 'dark' ? "text-zinc-300" : "text-zinc-700"
-                              )}>
-                                {item.content.replace(/^Hábito (adquirido|completado): /, '')}
-                              </p>
-                            </div>
-                          ))}
-                          {dayAchievements.length === 0 && 
-                           events.filter(e => e.completed).length === 0 && 
-                           goals.flatMap(g => g.tasks).filter(t => t.completed).length === 0 && (
-                            <p className="text-[15px] text-zinc-500 italic">Aún no hay logros registrados</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+        </div>
 
           <AnimatePresence>
           {showPerfectSchedule && (
@@ -2640,11 +2557,8 @@ export default function App() {
               </div>
             )}
           </AnimatePresence>
-        </div>
-
-        {/* Bottom Nav Removed */}
-      </main>
-    </div>
+        </main>
+      </div>
     </ErrorBoundary>
   );
 }

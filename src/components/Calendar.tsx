@@ -130,9 +130,35 @@ export default function Calendar({
   const lastSnappedMinutesRef = React.useRef<number | null>(null);
   const [showDiscrepancyAlert, setShowDiscrepancyAlert] = useState(false);
   const [discrepancyMessage, setDiscrepancyMessage] = useState('');
-  const [inactivityTimerRef, setInactivityTimerRef] = useState<any>(null);
   const [showGuideLine, setShowGuideLine] = useState(false);
   const guideInactivityTimerRef = React.useRef<any>(null);
+  const inactivityTimerRef = React.useRef<any>(null);
+  const startTimePickerTimerRef = React.useRef<any>(null);
+  const endTimePickerTimerRef = React.useRef<any>(null);
+
+  const startDeselectTimer = () => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = setTimeout(() => {
+      setSelectedEventId(null);
+      inactivityTimerRef.current = null;
+    }, 10000); // 10 seconds
+  };
+
+  const startStartTimePickerTimer = () => {
+    if (startTimePickerTimerRef.current) clearTimeout(startTimePickerTimerRef.current);
+    startTimePickerTimerRef.current = setTimeout(() => {
+      setIsStartTimePickerOpen(false);
+      startTimePickerTimerRef.current = null;
+    }, 5000); // 5 seconds
+  };
+
+  const startEndTimePickerTimer = () => {
+    if (endTimePickerTimerRef.current) clearTimeout(endTimePickerTimerRef.current);
+    endTimePickerTimerRef.current = setTimeout(() => {
+      setIsEndTimePickerOpen(false);
+      endTimePickerTimerRef.current = null;
+    }, 5000); // 5 seconds
+  };
 
   const startHour = workDayStart;
   const endHour = workDayEnd;
@@ -279,6 +305,8 @@ export default function Calendar({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      if (startTimePickerTimerRef.current) clearTimeout(startTimePickerTimerRef.current);
+      if (endTimePickerTimerRef.current) clearTimeout(endTimePickerTimerRef.current);
     };
   }, [events, currentDate, handlePointerUp, interactionMode]); // interactionMode still needed for body styles
 
@@ -1587,7 +1615,10 @@ export default function Calendar({
                         <label className="text-[16px] font-black text-zinc-500 uppercase tracking-widest">Hora Inicio</label>
                         <div className="relative">
                           <button
-                            onClick={() => setIsStartTimePickerOpen(!isStartTimePickerOpen)}
+                            onClick={() => {
+                              setIsStartTimePickerOpen(!isStartTimePickerOpen);
+                              if (!isStartTimePickerOpen) startStartTimePickerTimer();
+                            }}
                             className={cn(
                               "w-full border rounded-xl px-4 py-2.5 focus:outline-none text-left text-sm flex items-center justify-between",
                               theme === 'dark' ? "bg-zinc-950 border-zinc-800 text-white" : "bg-zinc-50 border-zinc-200 text-black"
@@ -1617,6 +1648,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
                                           setFormTime(`${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1628,6 +1660,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
                                           setFormTime(`${String((h - 1 + 24) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1641,6 +1674,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
                                           setFormTime(`${String(h).padStart(2, '0')}:${String((m + 15) % 60).padStart(2, '0')}`);
+                                          startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1652,6 +1686,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
                                           setFormTime(`${String(h).padStart(2, '0')}:${String((m - 15 + 60) % 60).padStart(2, '0')}`);
+                                          startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1681,7 +1716,10 @@ export default function Calendar({
                         <label className="text-[16px] font-black text-zinc-500 uppercase tracking-widest">Hora Fin</label>
                         <div className="relative">
                           <button
-                            onClick={() => setIsEndTimePickerOpen(!isEndTimePickerOpen)}
+                            onClick={() => {
+                              setIsEndTimePickerOpen(!isEndTimePickerOpen);
+                              if (!isEndTimePickerOpen) startEndTimePickerTimer();
+                            }}
                             className={cn(
                               "w-full border rounded-xl px-4 py-2.5 focus:outline-none text-left text-sm flex items-center justify-between",
                               theme === 'dark' ? "bg-zinc-950 border-zinc-800 text-white" : "bg-zinc-50 border-zinc-200 text-black"
@@ -1711,6 +1749,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1722,6 +1761,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String((h - 1 + 24) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1735,6 +1775,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String(h).padStart(2, '0')}:${String((m + 15) % 60).padStart(2, '0')}`);
+                                          startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >
@@ -1746,6 +1787,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String(h).padStart(2, '0')}:${String((m - 15 + 60) % 60).padStart(2, '0')}`);
+                                          startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
                                       >

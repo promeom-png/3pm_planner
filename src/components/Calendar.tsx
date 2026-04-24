@@ -215,6 +215,12 @@ export default function Calendar({
   // Global pointer listeners for precision interaction
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
+      // Reset handles timeout on any movement if something is active
+      if (interactionModeRef.current !== 'none' || selectedEventId) {
+        setShowGuideLine(true);
+        resetGuideTimer();
+      }
+
       if (!dayViewContainerRef.current || !resizingEventRef.current || interactionModeRef.current === 'none') return;
       
       const container = dayViewContainerRef.current;
@@ -307,8 +313,9 @@ export default function Calendar({
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       if (startTimePickerTimerRef.current) clearTimeout(startTimePickerTimerRef.current);
       if (endTimePickerTimerRef.current) clearTimeout(endTimePickerTimerRef.current);
+      if (guideInactivityTimerRef.current) clearTimeout(guideInactivityTimerRef.current);
     };
-  }, [events, currentDate, handlePointerUp, interactionMode]); // interactionMode still needed for body styles
+  }, [events, currentDate, handlePointerUp, interactionMode, selectedEventId]); // interactionMode still needed for body styles
 
   // Handle clicks outside to deselect
   useEffect(() => {
@@ -1047,7 +1054,7 @@ export default function Calendar({
                   onClick={() => openEventModal(currentDate, `${hour.toString().padStart(2, '0')}:00`)}
                 >
                   <span className={cn(
-                    "text-[11px] w-7 font-mono shrink-0 text-center flex items-center justify-center",
+                    "text-[11px] w-7 font-mono shrink-0 text-center flex items-start justify-center pt-0.5",
                     theme === 'dark' ? "text-white/60" : "text-zinc-400"
                   )}>{hour.toString().padStart(2, '0')}:00</span>
                   <div className="flex-1 h-full" />
@@ -1142,8 +1149,15 @@ export default function Calendar({
                   startDeselectTimer={startDeselectTimer}
                   interactionMode={interactionMode}
                   resizingEvent={resizingEvent}
+                  showGuideLine={showGuideLine}
                   selectedEventId={selectedEventId}
-                  setSelectedEventId={setSelectedEventId}
+                  setSelectedEventId={(id) => {
+                    setSelectedEventId(id);
+                    if (id) {
+                      setShowGuideLine(true);
+                      resetGuideTimer();
+                    }
+                  }}
                   setMode={setMode}
                   setResizingEvent={setResizingEvent}
                   openEventModal={openEventModal}
@@ -2046,6 +2060,7 @@ interface EventComponentProps {
   longPressTimerRef: React.MutableRefObject<NodeJS.Timeout | null>;
   clickTimerRef: React.MutableRefObject<NodeJS.Timeout | null>;
   theme?: 'dark' | 'light';
+  showGuideLine: boolean;
 }
 
 const EventComponent: React.FC<EventComponentProps> = ({
@@ -2070,7 +2085,8 @@ const EventComponent: React.FC<EventComponentProps> = ({
   setLastClickTime,
   longPressTimerRef,
   clickTimerRef,
-  theme
+  theme,
+  showGuideLine
 }) => {
   const pointerMovedRef = React.useRef(false);
   const startPosRef = React.useRef({ x: 0, y: 0 });
@@ -2168,7 +2184,7 @@ const EventComponent: React.FC<EventComponentProps> = ({
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
       whileTap={isSelected ? { scale: 1 } : { scale: 0.98 }}
       className={cn(
-        "absolute p-2 rounded-xl border cursor-grab active:cursor-grabbing calendar-event overflow-hidden",
+        "absolute p-1.5 rounded-xl border cursor-grab active:cursor-grabbing calendar-event overflow-hidden flex flex-col justify-center items-center text-center",
         !isInteracting && "transition-all", // Disable transitions during interaction for precision
         isSelected ? "ring-2 ring-white ring-offset-2 ring-offset-black border-transparent" : "border-white/10"
       )}
@@ -2183,69 +2199,76 @@ const EventComponent: React.FC<EventComponentProps> = ({
         zIndex: isInteracting ? 100 : (isSelected ? 50 : 20) // Ensure correct stacking even without motion animate
       }}
     >
-      <p className={cn("text-[17px] font-bold truncate leading-tight drop-shadow-sm", textColorClass)}>{event.title}</p>
+      <p className={cn("text-[15px] font-bold truncate leading-tight drop-shadow-sm w-full", textColorClass)}>{event.title}</p>
       {event.location && (
-        <div className="flex items-center gap-1 mt-0.5">
-          <MapPin className={cn("w-2 h-2", secondaryTextColorClass)} />
-          <span className={cn("text-[14px] truncate", secondaryTextColorClass)}>{event.location}</span>
+        <div className="flex items-center justify-center gap-1 mt-0.5 w-full">
+          <MapPin className={cn("w-2 h-2 shrink-0", secondaryTextColorClass)} />
+          <span className={cn("text-[12px] truncate", secondaryTextColorClass)}>{event.location}</span>
         </div>
       )}
 
       {/* Resize Handles - Circles */}
-      {isSelected && (interactionMode === 'none' || interactionMode === 'resizing-top' || interactionMode === 'resizing-bottom') && (
-        <>
-          {/* Top Handle */}
-          <div 
-            className="absolute top-0 left-0 right-0 h-8 -translate-y-1/2 z-[150] cursor-ns-resize flex items-center justify-center touch-none"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.currentTarget.setPointerCapture(e.pointerId);
-              if (longPressTimerRef.current) {
-                clearTimeout(longPressTimerRef.current);
-                longPressTimerRef.current = null;
-              }
-              handleInteractionStart(event, 'resizing-top', e.clientY);
-            }}
-            onPointerUp={(e) => {
-              e.currentTarget.releasePointerCapture(e.pointerId);
-            }}
+      <AnimatePresence>
+        {isSelected && showGuideLine && (interactionMode === 'none' || interactionMode === 'resizing-top' || interactionMode === 'resizing-bottom') && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 pointer-events-none"
           >
-            <div className={cn(
-              "w-6 h-6 rounded-full border-2 shadow-xl flex items-center justify-center transition-all duration-200",
-              interactionMode === 'resizing-top' ? "scale-125 bg-white border-primary" : "scale-100 bg-white border-black",
-              theme === 'dark' ? "bg-white border-black" : "bg-white border-zinc-900"
-            )}>
-              <div className={cn("w-2 h-2 rounded-full", theme === 'dark' ? "bg-black/20" : "bg-black/20")} />
+            {/* Top Handle */}
+            <div 
+              className="absolute top-0 left-0 right-0 h-8 -translate-y-1/2 z-[150] cursor-ns-resize flex items-center justify-center pointer-events-auto touch-none"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                if (longPressTimerRef.current) {
+                  clearTimeout(longPressTimerRef.current);
+                  longPressTimerRef.current = null;
+                }
+                handleInteractionStart(event, 'resizing-top', e.clientY);
+              }}
+              onPointerUp={(e) => {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }}
+            >
+              <div className={cn(
+                "w-6 h-6 rounded-full border-2 shadow-xl flex items-center justify-center transition-all duration-200",
+                interactionMode === 'resizing-top' ? "scale-125 bg-white border-primary" : "scale-100 bg-white border-black",
+                theme === 'dark' ? "bg-white border-black" : "bg-white border-zinc-900"
+              )}>
+                <div className={cn("w-2 h-2 rounded-full", theme === 'dark' ? "bg-black/20" : "bg-black/20")} />
+              </div>
             </div>
-          </div>
-          {/* Bottom Handle */}
-          <div 
-            className="absolute bottom-0 left-0 right-0 h-8 translate-y-1/2 z-[150] cursor-ns-resize flex items-center justify-center touch-none"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.currentTarget.setPointerCapture(e.pointerId);
-              if (longPressTimerRef.current) {
-                clearTimeout(longPressTimerRef.current);
-                longPressTimerRef.current = null;
-              }
-              handleInteractionStart(event, 'resizing-bottom', e.clientY);
-            }}
-            onPointerUp={(e) => {
-              e.currentTarget.releasePointerCapture(e.pointerId);
-            }}
-          >
-            <div className={cn(
-              "w-6 h-6 rounded-full border-2 shadow-xl flex items-center justify-center transition-all duration-200",
-              interactionMode === 'resizing-bottom' ? "scale-125 bg-white border-primary" : "scale-100 bg-white border-black",
-              theme === 'dark' ? "bg-white border-black" : "bg-white border-zinc-900"
-            )}>
-              <div className={cn("w-2 h-2 rounded-full", theme === 'dark' ? "bg-black/20" : "bg-black/20")} />
+            {/* Bottom Handle */}
+            <div 
+              className="absolute bottom-0 left-0 right-0 h-8 translate-y-1/2 z-[150] cursor-ns-resize flex items-center justify-center pointer-events-auto touch-none"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                if (longPressTimerRef.current) {
+                  clearTimeout(longPressTimerRef.current);
+                  longPressTimerRef.current = null;
+                }
+                handleInteractionStart(event, 'resizing-bottom', e.clientY);
+              }}
+              onPointerUp={(e) => {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }}
+            >
+              <div className={cn(
+                "w-6 h-6 rounded-full border-2 shadow-xl flex items-center justify-center transition-all duration-200",
+                interactionMode === 'resizing-bottom' ? "scale-125 bg-white border-primary" : "scale-100 bg-white border-black",
+                theme === 'dark' ? "bg-white border-black" : "bg-white border-zinc-900"
+              )}>
+                <div className={cn("w-2 h-2 rounded-full", theme === 'dark' ? "bg-black/20" : "bg-black/20")} />
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

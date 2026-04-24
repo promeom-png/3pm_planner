@@ -99,6 +99,43 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [perfectSchedule, setPerfectSchedule] = useState<PerfectSchedule>({ slots: {} });
   const [showPerfectSchedule, setShowPerfectSchedule] = useState(false);
+
+  // Orientation lock for Perfect Schedule
+  useEffect(() => {
+    if (showPerfectSchedule) {
+      const lockLandscape = async () => {
+        try {
+          // Check if it's a mobile device (rough check)
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+          if (!isMobile) return;
+
+          if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
+          }
+          if (screen.orientation && (screen.orientation as any).lock) {
+            await (screen.orientation as any).lock('landscape');
+          }
+        } catch (error) {
+          console.warn('Orientation lock failed:', error);
+        }
+      };
+      lockLandscape();
+    } else {
+      const unlockOrientation = async () => {
+        try {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            await document.exitFullscreen();
+          }
+          if (screen.orientation && (screen.orientation as any).unlock) {
+            (screen.orientation as any).unlock();
+          }
+        } catch (error) {
+          console.warn('Orientation unlock failed:', error);
+        }
+      };
+      unlockOrientation();
+    }
+  }, [showPerfectSchedule]);
   const lastNotifiedRef = React.useRef<string | null>(null);
   const lastClosureRef = React.useRef<string | null>(null);
   const lastAlignmentAchievementRef = React.useRef<string | null>(null);
@@ -2142,73 +2179,120 @@ export default function App() {
                         </label>
                       </div>
                     </div>
-                    
-                    {/* Quick Stats */}
-                    <div className={cn(
-                      "p-5 rounded-2xl border shadow-xl",
-                      theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                    )}>
-                      <h3 className="font-bold text-zinc-500 mb-4 text-[15px] uppercase tracking-widest">Agenda de Hoy</h3>
-                      <div className="space-y-4">
-                        {allEvents
-                          .filter(event => {
-                            if (event.category === 'holiday') return false;
-                            const eventDate = new Date(event.start);
-                            return isToday(eventDate);
-                          })
-                          .slice(0, 5)
-                          .map(event => (
-                          <div key={event.id} className="flex gap-3 items-start">
-                            <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: event.color }} />
-                            <div>
-                              <p className="text-[17px] font-semibold leading-tight">{event.title}</p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-[16px] text-zinc-500">
-                                  {format(new Date(event.start), 'HH:mm')} - {format(new Date(event.end), 'HH:mm')}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        {allEvents.filter(e => e.category !== 'holiday' && isToday(new Date(e.start))).length === 0 && (
-                          <p className="text-[15px] text-zinc-500 italic">No hay citas para hoy</p>
-                        )}
-                      </div>
-                    </div>
 
-                    <div className={cn(
-                      "p-5 rounded-2xl border shadow-xl",
-                      theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                    )}>
-                      <h3 className="font-bold text-zinc-500 mb-4 text-[15px] uppercase tracking-widest">Metas Prioritarias</h3>
-                      <div className="space-y-4">
-                        {goals.slice(0, 2).map(goal => {
-                          const goalEvents = events.filter(e => e.goalId === goal.id);
-                          const totalItems = goal.tasks.length + goalEvents.length;
-                          const completedItems = goal.tasks.filter(t => t.completed).length + goalEvents.filter(e => e.completed).length;
-                          const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-                          
-                          return (
-                            <div key={goal.id} className="space-y-2">
-                              <div className="flex justify-between text-[15px]">
-                                <span className="font-medium truncate pr-2">{goal.title}</span>
-                                <span className="text-emerald-400 font-bold">{Math.round(progress)}</span>
-                              </div>
-                              {goal.description && (
-                                <p className="text-[16px] text-zinc-500 line-clamp-1">{goal.description}</p>
-                              )}
-                              <div className={cn(
-                                "h-1.5 rounded-full overflow-hidden",
-                                theme === 'dark' ? "bg-zinc-800" : "bg-zinc-100"
-                              )}>
-                                <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                    {/* Quick Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Today's Agenda */}
+                      <div className={cn(
+                        "p-5 rounded-2xl border shadow-xl flex flex-col h-[320px]",
+                        theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                      )}>
+                        <h3 className="font-bold text-zinc-500 mb-4 text-[13px] uppercase tracking-widest shrink-0">Agenda de Hoy</h3>
+                        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                          {allEvents
+                            .filter(event => {
+                              if (event.category === 'holiday') return false;
+                              const eventDate = new Date(event.start);
+                              return isToday(eventDate);
+                            })
+                            .map(event => (
+                            <div key={event.id} className="flex gap-3 items-start">
+                              <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: event.color }} />
+                              <div>
+                                <p className="text-[17px] font-semibold leading-tight">{event.title}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[16px] text-zinc-500">
+                                    {format(new Date(event.start), 'HH:mm')} - {format(new Date(event.end), 'HH:mm')}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          );
-                        })}
-                        {goals.length === 0 && (
-                          <p className="text-[15px] text-zinc-500 italic">No hay metas activas</p>
-                        )}
+                          ))}
+                          {allEvents.filter(e => e.category !== 'holiday' && isToday(new Date(e.start))).length === 0 && (
+                            <p className="text-[15px] text-zinc-500 italic">No hay citas para hoy</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Active Goals */}
+                      <div className={cn(
+                        "p-5 rounded-2xl border shadow-xl flex flex-col h-[320px]",
+                        theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                      )}>
+                        <h3 className="font-bold text-zinc-500 mb-4 text-[13px] uppercase tracking-widest shrink-0">Metas Activas</h3>
+                        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                          {goals.filter(g => g.status === 'active').slice(0, 5).map(goal => {
+                            const goalEvents = events.filter(e => e.goalId === goal.id);
+                            const totalItems = goal.tasks.length + goalEvents.length;
+                            const completedItems = goal.tasks.filter(t => t.completed).length + goalEvents.filter(e => e.completed).length;
+                            const progressValue = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+                            
+                            return (
+                              <div key={goal.id} className="space-y-2">
+                                <div className="flex justify-between text-[15px]">
+                                  <span className="font-medium truncate pr-2">{goal.title}</span>
+                                  <span className="text-emerald-400 font-bold">{Math.round(progressValue)}%</span>
+                                </div>
+                                <div className={cn(
+                                  "h-1.5 rounded-full overflow-hidden",
+                                  theme === 'dark' ? "bg-zinc-800" : "bg-zinc-100"
+                                )}>
+                                  <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${progressValue}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {goals.filter(g => g.status === 'active').length === 0 && (
+                            <p className="text-[15px] text-zinc-500 italic">No hay metas activas</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Achievements Wall (Full Width on Desktop) */}
+                      <div className={cn(
+                        "p-5 rounded-2xl border shadow-xl flex flex-col h-[320px] md:col-span-2 overflow-hidden",
+                        theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                      )}>
+                        <h3 className="font-bold text-zinc-500 mb-4 text-[13px] uppercase tracking-widest shrink-0">Muro de Logros</h3>
+                        <div className="flex-1 relative overflow-hidden">
+                          {(() => {
+                            const rawAchievements = [
+                              ...allEvents.filter(e => e.completed).map(e => e.title),
+                              ...goals.flatMap(g => g.tasks).filter(t => t.completed).map(t => t.title),
+                              ...dayAchievements.map(a => a.content),
+                            ];
+
+                            const displayAchievs = rawAchievements.length > 5 
+                              ? rawAchievements 
+                              : ["Logro: Comenzaste el día con energía", "Logro: Planificaste con éxito", "Logro: Mantuviste el foco"];
+
+                            return (
+                              <div className="absolute inset-0 mask-gradient-v">
+                                <div className="animate-vertical-scroll space-y-3 py-4">
+                                  {[...displayAchievs, ...displayAchievs, ...displayAchievs].map((item, i) => (
+                                    <div 
+                                      key={`${i}-${item}`}
+                                      className={cn(
+                                        "p-4 rounded-2xl border flex items-center gap-4",
+                                        theme === 'dark' ? "bg-zinc-800/40 border-zinc-700/50" : "bg-zinc-50/50 border-zinc-100"
+                                      )}
+                                    >
+                                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-500/20 text-emerald-500 shrink-0 shadow-inner">
+                                        <Target className="w-5 h-5" />
+                                      </div>
+                                      <p className={cn(
+                                        "text-[17px] font-bold tracking-tight",
+                                        theme === 'dark' ? "text-white" : "text-zinc-800"
+                                      )}>
+                                        {item}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -326,36 +326,41 @@ export default function Calendar({
   }, [selectedEventId]);
 
   const handleSwipe = (offsetX: number, offsetY: number, velocityX: number, velocityY: number) => {
-    const swipeThreshold = 50;
-    const velocityThreshold = 300;
+    const swipeThreshold = 30; // Reduced for more sensitivity
+    const velocityThreshold = 200;
     
     const absX = Math.abs(offsetX);
     const absY = Math.abs(offsetY);
     const absVX = Math.abs(velocityX);
     const absVY = Math.abs(velocityY);
 
-    // Only handle horizontal swipes for navigation to avoid conflict with vertical scrolling
+    // Horizontal Swipe -> Infinite Cycle Views (Day <-> Week <-> Month)
     if (absX > absY && (absX > swipeThreshold || absVX > velocityThreshold)) {
-      if (offsetX > 0 || velocityX > velocityThreshold) { // Swipe Right -> Previous Date
+      const views: ViewType[] = ['day', 'week', 'month'];
+      const currentIndex = views.indexOf(view);
+      
+      if (offsetX > 0 || velocityX > velocityThreshold) { // Swipe Right -> Prev View
+        const prevIndex = (currentIndex - 1 + views.length) % views.length;
         setDirection(-1);
         setDirectionY(0);
-        handlePrev();
-      } else if (offsetX < 0 || velocityX < -velocityThreshold) { // Swipe Left -> Next Date
+        setView(views[prevIndex]);
+      } else if (offsetX < 0 || velocityX < -velocityThreshold) { // Swipe Left -> Next View
+        const nextIndex = (currentIndex + 1) % views.length;
         setDirection(1);
         setDirectionY(0);
-        handleNext();
+        setView(views[nextIndex]);
       }
     }
-    // Vertical swipes for view switching if significant enough, but usually better to use buttons
-    else if (absY > absX && (absY > 100 || absVY > velocityThreshold * 2)) {
-      if (offsetY > 0 || velocityY > velocityThreshold) {
-        // Swipe Down -> Switch views "outwards" (day -> week -> month)
-        if (view === 'day') setView('week');
-        else if (view === 'week') setView('month');
-      } else if (offsetY < 0 || velocityY < -velocityThreshold) {
-        // Swipe Up -> Switch views "inwards" (month -> week -> day)
-        if (view === 'month') setView('week');
-        else if (view === 'week') setView('day');
+    // Vertical Swipe -> Time Navigation (Prev <-> Next)
+    else if (absY > absX && (absY > swipeThreshold || absVY > velocityThreshold)) {
+      if (offsetY > 0 || velocityY > velocityThreshold) { // Swipe Down -> Prev Date/Week/Month
+        setDirection(0);
+        setDirectionY(-1);
+        handlePrev();
+      } else if (offsetY < 0 || velocityY < -velocityThreshold) { // Swipe Up -> Next Date/Week/Month
+        setDirection(0);
+        setDirectionY(1);
+        handleNext();
       }
     }
   };
@@ -1022,24 +1027,24 @@ export default function Calendar({
           {/* Habits in Day View - REMOVED per user request as they are on home page */}
           <div 
             className={cn(
-              "flex-1 relative overflow-y-auto scrollbar-hide",
+              "flex-1 relative overflow-hidden", // Force hide scroll to fit precisely
               interactionMode !== 'none' && "touch-none"
             )} 
             ref={dayViewContainerRef} 
             onClick={() => setSelectedEventId(null)}
           >
-            <div className="flex flex-col relative" style={{ minHeight: `${totalHours * 60}px` }}>
+            <div className="flex flex-col h-full relative">
               {hours.map((hour) => (
                 <div 
                   key={hour} 
                   className={cn(
-                    "flex-1 border-b flex items-start gap-1 relative",
+                    "flex-1 border-b flex items-stretch gap-1 relative",
                     theme === 'dark' ? "border-zinc-900/50" : "border-zinc-200/50"
                   )}
                   onClick={() => openEventModal(currentDate, `${hour.toString().padStart(2, '0')}:00`)}
                 >
                   <span className={cn(
-                    "text-[12px] w-7 font-mono -translate-y-1/2 shrink-0 text-center",
+                    "text-[11px] w-7 font-mono shrink-0 text-center flex items-center justify-center",
                     theme === 'dark' ? "text-white/60" : "text-zinc-400"
                   )}>{hour.toString().padStart(2, '0')}:00</span>
                   <div className="flex-1 h-full" />
@@ -1365,13 +1370,13 @@ export default function Calendar({
       <div className="flex-1 relative overflow-hidden">
         <motion.div 
           key={view + currentDate.toISOString()}
-          initial={{ opacity: 0, x: direction * 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -direction * 50 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.2}
+          initial={{ opacity: 0, x: direction * 50, y: directionY * 50 }}
+          animate={{ opacity: 1, x: 0, y: 0 }}
+          exit={{ opacity: 0, x: -direction * 50, y: -directionY * 50 }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          drag
+          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+          dragElastic={0.4}
           onDragEnd={(e, info) => {
             const { offset, velocity } = info;
             handleSwipe(offset.x, offset.y, velocity.x, velocity.y);

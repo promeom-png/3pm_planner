@@ -326,45 +326,36 @@ export default function Calendar({
   }, [selectedEventId]);
 
   const handleSwipe = (offsetX: number, offsetY: number, velocityX: number, velocityY: number) => {
-    const swipeThreshold = 20;
-    const velocityThreshold = 150;
+    const swipeThreshold = 50;
+    const velocityThreshold = 300;
     
     const absX = Math.abs(offsetX);
     const absY = Math.abs(offsetY);
     const absVX = Math.abs(velocityX);
     const absVY = Math.abs(velocityY);
 
-    // Axis detection: slightly more relaxed to catch natural swipes
-    const isHorizontal = absX > absY || absVX > absVY;
-    const isVertical = absY > absX || absVY > absVX;
-
-    if (isHorizontal) {
-      if (absX < swipeThreshold && absVX < velocityThreshold) return;
-
-      if (offsetX > 0 || velocityX > velocityThreshold) { // Swipe Right -> Move to "left" view
+    // Only handle horizontal swipes for navigation to avoid conflict with vertical scrolling
+    if (absX > absY && (absX > swipeThreshold || absVX > velocityThreshold)) {
+      if (offsetX > 0 || velocityX > velocityThreshold) { // Swipe Right -> Previous Date
         setDirection(-1);
         setDirectionY(0);
-        if (view === 'month') setView('week');
-        else if (view === 'week') setView('day');
-        else if (view === 'day') setView('month');
-      } else if (offsetX < 0 || velocityX < -velocityThreshold) { // Swipe Left -> Move to "right" view
+        handlePrev();
+      } else if (offsetX < 0 || velocityX < -velocityThreshold) { // Swipe Left -> Next Date
         setDirection(1);
         setDirectionY(0);
+        handleNext();
+      }
+    }
+    // Vertical swipes for view switching if significant enough, but usually better to use buttons
+    else if (absY > absX && (absY > 100 || absVY > velocityThreshold * 2)) {
+      if (offsetY > 0 || velocityY > velocityThreshold) {
+        // Swipe Down -> Switch views "outwards" (day -> week -> month)
         if (view === 'day') setView('week');
         else if (view === 'week') setView('month');
-        else if (view === 'month') setView('day');
-      }
-    } else if (isVertical) {
-      if (absY < swipeThreshold && absVY < velocityThreshold) return;
-
-      if (offsetY > 0 || velocityY > velocityThreshold) { // Swipe Down -> Previous date
-        setDirection(0);
-        setDirectionY(-1);
-        handlePrev();
-      } else if (offsetY < 0 || velocityY < -velocityThreshold) { // Swipe Up -> Next date
-        setDirection(0);
-        setDirectionY(1);
-        handleNext();
+      } else if (offsetY < 0 || velocityY < -velocityThreshold) {
+        // Swipe Up -> Switch views "inwards" (month -> week -> day)
+        if (view === 'month') setView('week');
+        else if (view === 'week') setView('day');
       }
     }
   };
@@ -1031,13 +1022,13 @@ export default function Calendar({
           {/* Habits in Day View - REMOVED per user request as they are on home page */}
           <div 
             className={cn(
-              "flex-1 relative overflow-hidden", // Changed overflow-y-auto to overflow-hidden
+              "flex-1 relative overflow-y-auto scrollbar-hide",
               interactionMode !== 'none' && "touch-none"
             )} 
             ref={dayViewContainerRef} 
             onClick={() => setSelectedEventId(null)}
           >
-            <div className="flex flex-col h-full relative" style={{ minHeight: `${totalHours * 40}px` }}>
+            <div className="flex flex-col relative" style={{ minHeight: `${totalHours * 60}px` }}>
               {hours.map((hour) => (
                 <div 
                   key={hour} 
@@ -1310,7 +1301,7 @@ export default function Calendar({
               <ChevronLeft className="w-[18px] h-[18px]" />
             </button>
             <h2 className={cn(
-              "text-[18px] font-bold capitalize min-w-[100px] text-center",
+              "text-[18px] font-bold capitalize min-w-[80px] text-center shrink-0",
               theme === 'dark' ? "text-white" : "text-black"
             )}>
               {format(currentDate, 'MMM yyyy', { locale: es }).replace('.', '')}
@@ -1320,9 +1311,9 @@ export default function Calendar({
             </button>
           </div>
 
-          {/* View Selector (PC only) */}
+          {/* View Selector - Responsive */}
           <div className={cn(
-            "hidden md:flex items-center gap-1 p-1 rounded-xl mx-4",
+            "flex items-center gap-1 p-0.5 rounded-xl",
             theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
           )}>
             {(['day', 'week', 'month'] as ViewType[]).map((v) => (
@@ -1330,19 +1321,20 @@ export default function Calendar({
                 key={v}
                 onClick={() => setView(v)}
                 className={cn(
-                  "px-3 py-1 rounded-lg text-[16px] font-bold uppercase tracking-wider transition-all", 
+                  "px-2 sm:px-3 py-1 rounded-lg text-[13px] sm:text-[16px] font-black uppercase tracking-wider transition-all", 
                   view === v 
-                    ? (theme === 'dark' ? "bg-zinc-800 text-white" : "bg-white text-black shadow-sm") 
+                    ? (theme === 'dark' ? "bg-[#228B22] text-white" : "bg-[#228B22] text-white shadow-sm") 
                     : (theme === 'dark' ? "text-zinc-500 hover:text-zinc-300" : "text-zinc-400 hover:text-zinc-600")
                 )}
               >
-                {v === 'day' ? 'Día' : v === 'week' ? 'Semana' : 'Mes'}
+                {v === 'day' ? 'D' : v === 'week' ? 'S' : 'M'}
+                <span className="hidden sm:inline">{v === 'day' ? 'ía' : v === 'week' ? 'emana' : 'es'}</span>
               </button>
             ))}
           </div>
           
           <div className={cn(
-            "flex items-center gap-1 p-1 rounded-xl",
+            "flex items-center gap-0.5 p-0.5 rounded-xl",
             theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
           )}>
             {[
@@ -1356,13 +1348,13 @@ export default function Calendar({
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={cn(
-                  "p-1.5 rounded-lg transition-all", 
+                  "p-1 rounded-lg transition-all", 
                   activeTab === item.id 
                     ? (theme === 'dark' ? "bg-zinc-800 text-white" : "bg-white text-black shadow-sm") 
                     : (theme === 'dark' ? "text-zinc-500" : "text-zinc-400")
                 )}
               >
-                <item.icon className={cn(item.id === 'calendar' ? "w-6 h-6" : "w-[22px] h-[22px]")} />
+                <item.icon className={cn(item.id === 'calendar' ? "w-5 h-5 sm:w-6 h-6" : "w-[18px] h-[18px] sm:w-[22px] h-[22px]")} />
               </button>
             ))}
           </div>
@@ -1371,11 +1363,25 @@ export default function Calendar({
 
       {/* Swipeable Content */}
       <div className="flex-1 relative overflow-hidden">
-        <div className="h-full w-full">
+        <motion.div 
+          key={view + currentDate.toISOString()}
+          initial={{ opacity: 0, x: direction * 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -direction * 50 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={(e, info) => {
+            const { offset, velocity } = info;
+            handleSwipe(offset.x, offset.y, velocity.x, velocity.y);
+          }}
+          className="h-full w-full"
+        >
           {view === 'month' && renderMonthView()}
           {view === 'week' && renderWeekView()}
           {view === 'day' && renderDayView()}
-        </div>
+        </motion.div>
       </div>
 
       {/* Habits Modal */}

@@ -732,10 +732,10 @@ export default function Calendar({
 
     return (
       <div className={cn(
-        "flex-1 p-1 overflow-hidden",
+        "flex-1 p-0.5 sm:p-1 overflow-hidden",
         theme === 'dark' ? "bg-black" : "bg-[#f5f5f0]"
       )}>
-        <div className="grid grid-cols-2 grid-rows-4 gap-1 h-full max-h-full">
+        <div className="grid grid-cols-2 grid-rows-4 gap-0.5 sm:gap-1 h-full max-h-full">
           {/* 7 Days Boxes */}
           {weekDays.map((day) => {
             const dayEvents = getEventsForDay(day)
@@ -747,16 +747,16 @@ export default function Calendar({
             return (
               <div 
                 key={day.toString()} 
-                onClick={() => openEventModal(day)}
+                onClick={(e) => { e.stopPropagation(); openEventModal(day); }}
                 className={cn(
-                  "rounded-xl p-2 border flex flex-col overflow-hidden transition-all h-full",
+                  "rounded-xl p-1.5 sm:p-2 border flex flex-col overflow-hidden transition-all h-full",
                   theme === 'dark' 
                     ? (holidays.length > 0 ? "bg-[#228B22]/10 border-[#228B22]/30" : "bg-zinc-950 border-zinc-900") 
                     : (holidays.length > 0 ? "bg-[#228B22]/5 border-[#228B22]/20" : "bg-white border-zinc-200 shadow-sm")
                 )}
               >
                 <div className={cn(
-                  "flex items-baseline gap-1 mb-1 border-b pb-0.5",
+                  "flex items-baseline gap-1 mb-1 border-b pb-0.5 shrink-0",
                   theme === 'dark' ? "border-zinc-900" : "border-zinc-100"
                 )}>
                   <span className={cn(
@@ -1295,28 +1295,28 @@ export default function Calendar({
 
       {/* Header */}
       <div className={cn(
-        "flex flex-col border-b",
+        "flex flex-col border-b shrink-0 z-20 sticky top-0",
         theme === 'dark' ? "bg-black border-zinc-900" : "bg-[#f5f5f0] border-zinc-200"
       )}>
-        <div className="flex items-center justify-between px-4 py-2">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 h-[56px] sm:h-auto">
           <div className="flex items-center gap-1">
-            <button onClick={handlePrev} className="p-1 text-zinc-500 hover:text-white">
-              <ChevronLeft className="w-[18px] h-[18px]" />
+            <button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-1.5 text-zinc-500 hover:text-white">
+              <ChevronLeft className="w-5 h-5 sm:w-[18px] h-[18px]" />
             </button>
             <h2 className={cn(
-              "text-[18px] font-bold capitalize min-w-[80px] text-center shrink-0",
+              "text-[17px] sm:text-[18px] font-black capitalize min-w-[70px] sm:min-w-[80px] text-center shrink-0",
               theme === 'dark' ? "text-white" : "text-black"
             )}>
               {format(currentDate, 'MMM yyyy', { locale: es }).replace('.', '')}
             </h2>
-            <button onClick={handleNext} className="p-1 text-zinc-500 hover:text-white">
-              <ChevronRight className="w-[18px] h-[18px]" />
+            <button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-1.5 text-zinc-500 hover:text-white">
+              <ChevronRight className="w-5 h-5 sm:w-[18px] h-[18px]" />
             </button>
           </div>
 
-          {/* View Selector - Responsive */}
+          {/* View Selector - Responsive - HIDDEN on mobile per user request */}
           <div className={cn(
-            "flex items-center gap-1 p-0.5 rounded-xl",
+            "hidden sm:flex items-center gap-1 p-0.5 rounded-xl",
             theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
           )}>
             {(['day', 'week', 'month'] as ViewType[]).map((v) => (
@@ -1337,7 +1337,7 @@ export default function Calendar({
           </div>
           
           <div className={cn(
-            "flex items-center gap-0.5 p-0.5 rounded-xl",
+            "flex items-center gap-1 sm:gap-0.5 p-0.5 rounded-xl",
             theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
           )}>
             {[
@@ -1349,15 +1349,15 @@ export default function Calendar({
             ].map((item) => (
               <button 
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={(e) => { e.stopPropagation(); setActiveTab(item.id); }}
                 className={cn(
-                  "p-1 rounded-lg transition-all", 
+                  "p-1.5 sm:p-1 rounded-lg transition-all", 
                   activeTab === item.id 
                     ? (theme === 'dark' ? "bg-zinc-800 text-white" : "bg-white text-black shadow-sm") 
                     : (theme === 'dark' ? "text-zinc-500" : "text-zinc-400")
                 )}
               >
-                <item.icon className={cn(item.id === 'calendar' ? "w-5 h-5 sm:w-6 h-6" : "w-[18px] h-[18px] sm:w-[22px] h-[22px]")} />
+                <item.icon className={cn(item.id === 'calendar' ? "w-6 h-6 sm:w-6 h-6" : "w-[22px] h-[22px] sm:w-[22px] h-[22px]")} />
               </button>
             ))}
           </div>
@@ -1365,26 +1365,28 @@ export default function Calendar({
       </div>
 
       {/* Swipeable Content */}
-      <div className="flex-1 relative overflow-hidden">
-        <motion.div 
-          key={view + currentDate.toISOString()}
-          initial={{ opacity: 0, x: direction * 50, y: directionY * 50 }}
-          animate={{ opacity: 1, x: 0, y: 0 }}
-          exit={{ opacity: 0, x: -direction * 50, y: -directionY * 50 }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          drag={interactionMode === 'none'}
-          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-          dragElastic={0.4}
-          onDragEnd={(e, info) => {
-            const { offset, velocity } = info;
-            handleSwipe(offset.x, offset.y, velocity.x, velocity.y);
-          }}
-          className="h-full w-full"
-        >
-          {view === 'month' && renderMonthView()}
-          {view === 'week' && renderWeekView()}
-          {view === 'day' && renderDayView()}
-        </motion.div>
+      <div className="flex-1 relative overflow-hidden bg-inherit">
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={view + currentDate.toISOString()}
+            initial={{ opacity: 0, x: direction * 50, y: directionY * 50 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, x: -direction * 50, y: -directionY * 50 }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
+            drag={interactionMode === 'none'}
+            dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+            dragElastic={0.4}
+            onDragEnd={(e, info) => {
+              const { offset, velocity } = info;
+              handleSwipe(offset.x, offset.y, velocity.x, velocity.y);
+            }}
+            className="h-full w-full absolute inset-0"
+          >
+            {view === 'month' && renderMonthView()}
+            {view === 'week' && renderWeekView()}
+            {view === 'day' && renderDayView()}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Habits Modal */}

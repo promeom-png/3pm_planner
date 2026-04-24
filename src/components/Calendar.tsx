@@ -901,7 +901,7 @@ export default function Calendar({
   };
 
   const renderDayView = () => {
-    const hours = Array.from({ length: totalHours }, (_, i) => startHour + i);
+    const hours = Array.from({ length: totalHours + 2 }, (_, i) => startHour + i);
     const dayEvents = getEventsForDay(currentDate);
     const holidays = dayEvents.filter(e => e.category === 'holiday');
     const regularEvents = dayEvents.filter(e => e.category !== 'holiday');
@@ -965,6 +965,9 @@ export default function Calendar({
     };
 
     const layouts = getLayouts();
+    
+    // Adjusted scrollHeight for extended hours
+    const totalMinutesVisible = (totalHours + 2) * 60;
 
   const handleInteractionStart = (event: CalendarEvent, mode: 'moving' | 'resizing-top' | 'resizing-bottom', pointerY: number) => {
     if (!dayViewContainerRef.current) return;
@@ -972,14 +975,14 @@ export default function Calendar({
     const rect = container.getBoundingClientRect();
     const scrollTop = container.scrollTop;
     const scrollHeight = container.scrollHeight;
-    const totalMinutes = totalHours * 60;
+    const totalMinutes = totalMinutesVisible;
     
     if (mode === 'moving') {
       const start = parseISO(event.start);
       const eventHour = start.getHours();
       const eventMinutes = start.getMinutes();
       const hourIndex = eventHour - startHour;
-      const eventTop = (hourIndex + eventMinutes / 60) * (scrollHeight / totalHours);
+      const eventTop = (hourIndex + eventMinutes / 60) * (scrollHeight / (totalHours + 2));
       dragOffsetRef.current = (pointerY - rect.top + scrollTop) - eventTop;
     }
     
@@ -1074,7 +1077,7 @@ export default function Calendar({
                   const baseDate = startOfDay(currentDate);
                   baseDate.setHours(startHour, 0, 0, 0);
                   const diff = differenceInMinutes(date, baseDate);
-                  return `${(diff / (totalHours * 60)) * 100}%`;
+                  return `${(diff / ((totalHours + 2) * 60)) * 100}%`;
                 } catch(e) {
                   return '0%';
                 }
@@ -1107,15 +1110,15 @@ export default function Calendar({
             const eventHour = start.getHours();
             const eventMinutes = start.getMinutes();
             
-            // Only show if within work hours
-            if (eventHour < startHour || eventHour > endHour) return null;
+            // Show if within work hours or in the extra 2 slots
+            if (eventHour < startHour || eventHour > endHour + 1) return null;
 
             const hourIndex = eventHour - startHour;
-            const topPercent = (hourIndex + eventMinutes / 60) * (100 / totalHours);
+            const topPercent = (hourIndex + eventMinutes / 60) * (100 / (totalHours + 2));
             
             // Calculate height based on duration
             const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-            const heightPercent = (durationMinutes / 60) * (100 / totalHours);
+            const heightPercent = (durationMinutes / 60) * (100 / (totalHours + 2));
             const isSelected = selectedEventId === event.id;
 
               const contrastColor = getContrastColor(event.color);
@@ -1158,70 +1161,66 @@ export default function Calendar({
 
         {/* Right Sidebar for Date */}
         <div className={cn(
-          "w-20 border-l flex flex-col items-center py-4 px-2 text-center relative overflow-hidden",
+          "w-20 border-l flex flex-col items-center p-2 text-center relative overflow-hidden",
           theme === 'dark' ? "border-zinc-900 bg-zinc-950" : "border-zinc-200 bg-white"
         )}>
-            {/* Habit Dots at the top (Vertical) */}
-            <div className="flex flex-col gap-1 mb-2">
-              {(habits || []).filter(h => (h.completedDates || []).includes(format(currentDate, 'yyyy-MM-dd'))).slice(0, 6).map(habit => (
-                <div 
-                  key={habit.id}
-                  title={habit.title}
-                  className={cn(
-                    "w-2.5 h-2.5 rounded-full shadow-sm border border-black/10",
-                    habit.category === 'professional' ? "bg-blue-500" : "bg-[#228B22]"
-                  )}
-                />
-              ))}
-            </div>
+          {/* Top Habit Dots (Fixed height section) */}
+          <div className="h-20 flex flex-col items-center justify-center gap-1 shrink-0">
+            {(habits || []).filter(h => (h.completedDates || []).includes(format(currentDate, 'yyyy-MM-dd'))).slice(0, 4).map(habit => (
+              <div 
+                key={habit.id}
+                className={cn(
+                  "w-2.5 h-2.5 rounded-full shadow-sm border border-black/10",
+                  habit.category === 'professional' ? "bg-blue-500" : "bg-[#228B22]"
+                )}
+              />
+            ))}
+          </div>
           
-          <div className="flex-1" />
-
-          {/* Centered Date */}
-          <div className="flex flex-col items-center gap-0.5">
-            <span className={cn(
-              "text-[16px] font-bold lowercase tracking-tighter",
-              theme === 'dark' ? "text-white" : "text-zinc-800"
-            )}>
-              {format(currentDate, "EEEE", { locale: es }).toLowerCase()}
-            </span>
-            <span 
-              className="text-4xl font-black leading-none my-0.5"
-              style={{ 
-                color: isToday(currentDate) 
-                  ? '#228B22' 
-                  : getDay(currentDate) === 0 
-                    ? '#ef4444' 
-                    : '#f97316' 
-              }}
-            >
-              {format(currentDate, "d")}
-            </span>
-            <span className={cn(
-              "text-[18px] font-bold lowercase",
-              theme === 'dark' ? "text-white" : "text-zinc-800"
-            )}>
-              {format(currentDate, "MMMM", { locale: es }).toLowerCase()}
-            </span>
-            <span className={cn(
-              "text-[15px] font-medium",
-              theme === 'dark' ? "text-white/60" : "text-zinc-400"
-            )}>
-              {format(currentDate, "yyyy")}
-            </span>
+          {/* Main Content Area - Center Date vertically in this column */}
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="flex flex-col items-center gap-0.5">
+              <span className={cn(
+                "text-[16px] font-bold lowercase tracking-tighter",
+                theme === 'dark' ? "text-white" : "text-zinc-800"
+              )}>
+                {format(currentDate, "EEEE", { locale: es }).toLowerCase()}
+              </span>
+              <span 
+                className="text-4xl font-black leading-none my-0.5"
+                style={{ 
+                  color: isToday(currentDate) 
+                    ? '#228B22' 
+                    : getDay(currentDate) === 0 
+                      ? '#ef4444' 
+                      : '#f97316' 
+                }}
+              >
+                {format(currentDate, "d")}
+              </span>
+              <span className={cn(
+                "text-[18px] font-bold lowercase",
+                theme === 'dark' ? "text-white" : "text-zinc-800"
+              )}>
+                {format(currentDate, "MMMM", { locale: es }).toLowerCase()}
+              </span>
+              <span className={cn(
+                "text-[15px] font-medium",
+                theme === 'dark' ? "text-white/60" : "text-zinc-400"
+              )}>
+                {format(currentDate, "yyyy")}
+              </span>
+            </div>
           </div>
 
-          <div className="flex-1" />
-
-          {/* Icons in lower half */}
-          <div className="flex flex-col gap-3 mb-12">
+          {/* Bottom Icons Area - Centered between date and bottom */}
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
             <button 
               onClick={() => setIsHabitsModalOpen(true)}
               className={cn(
                 "p-2 rounded-2xl transition-all active:scale-95 shadow-lg flex flex-col items-center justify-center gap-1",
                 theme === 'dark' ? "bg-zinc-900 hover:bg-zinc-800 text-[#228B22]" : "bg-zinc-100 hover:bg-zinc-200 text-[#228B22]"
               )}
-              title="Hábitos"
             >
               <div className="relative">
                 <Settings className="w-4 h-4" />
@@ -1237,7 +1236,6 @@ export default function Calendar({
                 "p-2 rounded-2xl transition-all active:scale-95 shadow-lg flex flex-col items-center justify-center gap-1",
                 theme === 'dark' ? "bg-zinc-900 hover:bg-zinc-800 text-amber-500" : "bg-zinc-100 hover:bg-zinc-200 text-amber-500"
               )}
-              title="Cierre del Día"
             >
               <Key className="w-4 h-4" />
               <span className="text-[11px] font-bold uppercase tracking-tighter opacity-70">Cierre</span>
@@ -1374,7 +1372,7 @@ export default function Calendar({
           animate={{ opacity: 1, x: 0, y: 0 }}
           exit={{ opacity: 0, x: -direction * 50, y: -directionY * 50 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          drag
+          drag={interactionMode === 'none'}
           dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
           dragElastic={0.4}
           onDragEnd={(e, info) => {

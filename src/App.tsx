@@ -1396,7 +1396,7 @@ export default function App() {
           {activeTab === 'goals' && (
             <div key="goals" className="h-full flex flex-col">
               <div className={cn(
-                "flex items-center justify-between px-4 py-2 border-b",
+                "flex items-center justify-end px-3 sm:px-4 py-2 border-b h-[56px] sm:h-auto",
                 theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
               )}>
                   <div className={cn(
@@ -1449,7 +1449,7 @@ export default function App() {
             {activeTab === 'notes' && (
               <div key="notes" className="h-full flex flex-col">
                 <div className={cn(
-                  "flex items-center justify-between px-4 py-2 border-b",
+                  "flex items-center justify-end px-3 sm:px-4 py-2 border-b h-[56px] sm:h-auto",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
                 )}>
                   <div className={cn(
@@ -1548,7 +1548,7 @@ export default function App() {
                 className="h-full flex flex-col"
               >
                 <div className={cn(
-                  "flex items-center justify-between px-4 py-2 border-b",
+                  "flex items-center justify-end px-3 sm:px-4 py-2 border-b h-[56px] sm:h-auto",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
                 )}>
                   <div className={cn(
@@ -2092,7 +2092,7 @@ export default function App() {
             {activeTab === 'dashboard' && (
               <div key="dashboard" className="h-full flex flex-col">
                 <div className={cn(
-                  "flex items-center justify-between px-4 py-2 border-b",
+                  "flex items-center justify-end px-3 sm:px-4 py-2 border-b h-[56px] sm:h-auto",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
                 )}>
                   <div className={cn(

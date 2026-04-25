@@ -141,8 +141,9 @@ export default function Calendar({
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     inactivityTimerRef.current = setTimeout(() => {
       setSelectedEventId(null);
+      setShowGuideLine(false);
       inactivityTimerRef.current = null;
-    }, 10000); // 10 seconds
+    }, 2500); // 2.5 seconds
   };
 
   const startStartTimePickerTimer = () => {
@@ -176,6 +177,7 @@ export default function Calendar({
     if (mode !== 'none') {
       setShowGuideLine(true);
       resetGuideTimer();
+      startDeselectTimer();
     } else {
       setShowGuideLine(false);
       if (guideInactivityTimerRef.current) clearTimeout(guideInactivityTimerRef.current);
@@ -216,10 +218,11 @@ export default function Calendar({
   // Global pointer listeners for precision interaction
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
-      // Reset handles timeout on any movement if something is active
-      if (interactionModeRef.current !== 'none' || selectedEventId) {
+      // Reset handles timeout only during active interaction
+      if (interactionModeRef.current !== 'none') {
         setShowGuideLine(true);
         resetGuideTimer();
+        startDeselectTimer();
       }
 
       if (!dayViewContainerRef.current || !resizingEventRef.current || interactionModeRef.current === 'none') return;
@@ -1163,6 +1166,7 @@ export default function Calendar({
                     if (id) {
                       setShowGuideLine(true);
                       resetGuideTimer();
+                      startDeselectTimer();
                     }
                   }}
                   setMode={setMode}
@@ -2179,7 +2183,6 @@ const EventComponent: React.FC<EventComponentProps> = ({
           if (now - lastClickTime < 300) {
             // Double Tap -> Show handles (tiradores)
             setSelectedEventId(event.id);
-            startDeselectTimer();
             setLastClickTime(0);
             if (clickTimerRef.current) {
               clearTimeout(clickTimerRef.current);

@@ -114,6 +114,7 @@ export default function Calendar({
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]); // 0-6 for Sun-Sat
   const [isStartTimePickerOpen, setIsStartTimePickerOpen] = useState(false);
   const [isEndTimePickerOpen, setIsEndTimePickerOpen] = useState(false);
+  const [didEditEndTime, setDidEditEndTime] = useState(false);
   const [formGoalId, setFormGoalId] = useState<string>('');
   const [formLocation, setFormLocation] = useState('');
   const [formColor, setFormColor] = useState(CLIENT_COLORS[0]);
@@ -393,6 +394,7 @@ export default function Calendar({
       setFormDate(format(start, 'yyyy-MM-dd'));
       setFormTime(format(start, 'HH:mm'));
       setFormEndTime(format(end, 'HH:mm'));
+      setDidEditEndTime(true); // Treat existing events as edited
       setFormGoalId(event.goalId || '');
       setFormLocation(event.location || '');
       setFormColor(event.color);
@@ -413,6 +415,7 @@ export default function Calendar({
       setFormGoalId('');
       setFormColor(CLIENT_COLORS[0]);
       setIsRecurring(false);
+      setDidEditEndTime(false); // Reset for new events
       setRecurrenceFrequency('daily');
       setRecurrenceEndDate(format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
       setRecurrenceDays([]);
@@ -436,9 +439,8 @@ export default function Calendar({
       
       setFormTime(initialTime);
       const [h, m] = initialTime.split(':').map(Number);
-      const endDate = new Date();
-      endDate.setHours(h, m + 60);
-      setFormEndTime(format(endDate, 'HH:mm'));
+      const endH = (h + 1) % 24;
+      setFormEndTime(`${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
     setIsModalOpen(true);
   };
@@ -739,10 +741,10 @@ export default function Calendar({
 
     return (
       <div className={cn(
-        "flex-1 p-0.5 sm:p-1 overflow-hidden",
+        "flex-1 p-0.5 sm:p-1 h-full",
         theme === 'dark' ? "bg-black" : "bg-[#f5f5f0]"
       )}>
-        <div className="grid grid-cols-2 grid-rows-4 gap-0.5 sm:gap-1 h-full max-h-full">
+        <div className="grid grid-cols-2 grid-rows-4 gap-0.5 sm:gap-1 h-full">
           {/* 7 Days Boxes */}
           {weekDays.map((day) => {
             const dayEvents = getEventsForDay(day)
@@ -908,10 +910,19 @@ export default function Calendar({
   };
 
   const renderDayView = () => {
-    const hours = Array.from({ length: totalHours + 2 }, (_, i) => startHour + i);
     const dayEvents = getEventsForDay(currentDate);
     const holidays = dayEvents.filter(e => e.category === 'holiday');
     const regularEvents = dayEvents.filter(e => e.category !== 'holiday');
+
+    // Dynamically calculate start and end hours to fit all events
+    const startHourDay = Math.min(workDayStart, ...regularEvents.map(e => parseISO(e.start).getHours()));
+    const endHourDay = Math.max(workDayEnd, ...regularEvents.map(e => {
+      const end = parseISO(e.end);
+      return end.getHours() + (end.getMinutes() > 0 ? 1 : 0);
+    }));
+    const displayHoursCount = endHourDay - startHourDay + 1;
+
+    const hours = Array.from({ length: displayHoursCount }, (_, i) => startHourDay + i);
 
     // Calculate layout for overlapping events
     const getLayouts = () => {
@@ -973,33 +984,29 @@ export default function Calendar({
 
     const layouts = getLayouts();
     
-    // Adjusted scrollHeight for extended hours
-    const totalMinutesVisible = (totalHours + 2) * 60;
+    const totalMinutesVisible = displayHoursCount * 60;
 
-  const handleInteractionStart = (event: CalendarEvent, mode: 'moving' | 'resizing-top' | 'resizing-bottom', pointerY: number) => {
-    if (!dayViewContainerRef.current) return;
-    const container = dayViewContainerRef.current;
-    const rect = container.getBoundingClientRect();
-    const scrollTop = container.scrollTop;
-    const scrollHeight = container.scrollHeight;
-    const totalMinutes = totalMinutesVisible;
-    
-    if (mode === 'moving') {
-      const start = parseISO(event.start);
-      const eventHour = start.getHours();
-      const eventMinutes = start.getMinutes();
-      const hourIndex = eventHour - startHour;
-      const eventTop = (hourIndex + eventMinutes / 60) * (scrollHeight / (totalHours + 2));
-      dragOffsetRef.current = (pointerY - rect.top + scrollTop) - eventTop;
-    }
-    
-    // Reset snapped minutes tracker
-    lastSnappedMinutesRef.current = null;
-    
-    setMode(mode);
-    updateResizingEvent({ id: event.id });
-    if (window.navigator.vibrate) window.navigator.vibrate(20);
-  };
+    const handleInteractionStart = (event: CalendarEvent, mode: 'moving' | 'resizing-top' | 'resizing-bottom', pointerY: number) => {
+      if (!dayViewContainerRef.current) return;
+      const container = dayViewContainerRef.current;
+      const rect = container.getBoundingClientRect();
+      const scrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight;
+      
+      if (mode === 'moving') {
+        const start = parseISO(event.start);
+        const eventHour = start.getHours();
+        const eventMinutes = start.getMinutes();
+        const hourIndex = eventHour - startHourDay;
+        const eventTop = (hourIndex + eventMinutes / 60) * (scrollHeight / displayHoursCount);
+        dragOffsetRef.current = (pointerY - rect.top + scrollTop) - eventTop;
+      }
+      
+      lastSnappedMinutesRef.current = null;
+      setMode(mode);
+      updateResizingEvent({ id: event.id });
+      if (window.navigator.vibrate) window.navigator.vibrate(20);
+    };
 
     return (
       <div className={cn(
@@ -1082,9 +1089,9 @@ export default function Calendar({
                   const date = parseISO(timeStr);
                   if (isNaN(date.getTime())) return '0%';
                   const baseDate = startOfDay(currentDate);
-                  baseDate.setHours(startHour, 0, 0, 0);
+                  baseDate.setHours(startHourDay, 0, 0, 0);
                   const diff = differenceInMinutes(date, baseDate);
-                  return `${(diff / ((totalHours + 2) * 60)) * 100}%`;
+                  return `${(diff / totalMinutesVisible) * 100}%`;
                 } catch(e) {
                   return '0%';
                 }
@@ -1118,14 +1125,14 @@ export default function Calendar({
             const eventMinutes = start.getMinutes();
             
             // Show if within work hours or in the extra 2 slots
-            if (eventHour < startHour || eventHour > endHour + 1) return null;
+            if (eventHour < startHourDay || eventHour > endHourDay) return null;
 
-            const hourIndex = eventHour - startHour;
-            const topPercent = (hourIndex + eventMinutes / 60) * (100 / (totalHours + 2));
+            const hourIndex = eventHour - startHourDay;
+            const topPercent = (hourIndex + eventMinutes / 60) * (100 / displayHoursCount);
             
             // Calculate height based on duration
             const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-            const heightPercent = (durationMinutes / 60) * (100 / (totalHours + 2));
+            const heightPercent = (durationMinutes / 60) * (100 / displayHoursCount);
             const isSelected = selectedEventId === event.id;
 
               const contrastColor = getContrastColor(event.color);
@@ -1175,11 +1182,11 @@ export default function Calendar({
 
         {/* Right Sidebar for Date */}
         <div className={cn(
-          "w-20 border-l flex flex-col items-center p-2 text-center relative overflow-hidden",
+          "w-20 sm:w-24 border-l flex flex-col items-center py-4 overflow-hidden",
           theme === 'dark' ? "border-zinc-900 bg-zinc-950" : "border-zinc-200 bg-white"
         )}>
-          {/* Top Habit Dots (Fixed height section) */}
-          <div className="h-20 flex flex-col items-center justify-center gap-1 shrink-0">
+          {/* Top Habit Dots */}
+          <div className="flex flex-wrap justify-center gap-1.5 px-2 mb-4 shrink-0">
             {(habits || []).filter(h => (h.completedDates || []).includes(format(currentDate, 'yyyy-MM-dd'))).slice(0, 4).map(habit => (
               <div 
                 key={habit.id}
@@ -1191,8 +1198,8 @@ export default function Calendar({
             ))}
           </div>
           
-          {/* Main Content Area - Center Date vertically in this column */}
-          <div className="flex-1 flex flex-col items-center justify-center">
+          {/* Main Content Area - Center Date and Icons together vertically */}
+          <div className="flex-1 flex flex-col items-center justify-around py-8">
             <div className="flex flex-col items-center gap-0.5">
               <span className={cn(
                 "text-[16px] font-bold lowercase tracking-tighter",
@@ -1225,35 +1232,34 @@ export default function Calendar({
                 {format(currentDate, "yyyy")}
               </span>
             </div>
-          </div>
 
-          {/* Bottom Icons Area - Centered between date and bottom */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-3">
-            <button 
-              onClick={() => setIsHabitsModalOpen(true)}
-              className={cn(
-                "p-2 rounded-2xl transition-all active:scale-95 shadow-lg flex flex-col items-center justify-center gap-1",
-                theme === 'dark' ? "bg-zinc-900 hover:bg-zinc-800 text-[#228B22]" : "bg-zinc-100 hover:bg-zinc-200 text-[#228B22]"
-              )}
-            >
-              <div className="relative">
-                <Settings className="w-4 h-4" />
-                <Settings className="w-2.5 h-2.5 absolute -top-1 -right-1" />
-                <Settings className="w-2.5 h-2.5 absolute -bottom-1 -left-1" />
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-tighter opacity-70">Hábitos</span>
-            </button>
+            <div className="flex flex-col items-center gap-4">
+              <button 
+                onClick={() => setIsHabitsModalOpen(true)}
+                className={cn(
+                  "p-2.5 rounded-2xl transition-all active:scale-95 shadow-lg flex flex-col items-center justify-center gap-1 min-w-[70px]",
+                  theme === 'dark' ? "bg-zinc-900 hover:bg-zinc-800 text-[#228B22]" : "bg-zinc-100 hover:bg-zinc-200 text-[#228B22]"
+                )}
+              >
+                <div className="relative">
+                  <Settings className="w-5 h-5" />
+                  <Settings className="w-3 h-3 absolute -top-1 -right-1" />
+                  <Settings className="w-3 h-3 absolute -bottom-1 -left-1" />
+                </div>
+                <span className="text-[11px] font-black uppercase tracking-tighter opacity-80">Hábitos</span>
+              </button>
 
-            <button 
-              onClick={onDayClosure}
-              className={cn(
-                "p-2 rounded-2xl transition-all active:scale-95 shadow-lg flex flex-col items-center justify-center gap-1",
-                theme === 'dark' ? "bg-zinc-900 hover:bg-zinc-800 text-amber-500" : "bg-zinc-100 hover:bg-zinc-200 text-amber-500"
-              )}
-            >
-              <Key className="w-4 h-4" />
-              <span className="text-[11px] font-bold uppercase tracking-tighter opacity-70">Cierre</span>
-            </button>
+              <button 
+                onClick={onDayClosure}
+                className={cn(
+                  "p-2.5 rounded-2xl transition-all active:scale-95 shadow-lg flex flex-col items-center justify-center gap-1 min-w-[70px]",
+                  theme === 'dark' ? "bg-zinc-900 hover:bg-zinc-800 text-amber-500" : "bg-zinc-100 hover:bg-zinc-200 text-amber-500"
+                )}
+              >
+                <Key className="w-5 h-5" />
+                <span className="text-[11px] font-black uppercase tracking-tighter opacity-80">Cierre</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1314,7 +1320,7 @@ export default function Calendar({
       )}>
         <div className="flex items-center justify-between px-3 sm:px-4 py-2 h-[56px] sm:h-auto">
           <div className="flex items-center gap-1">
-            <button onClick={(e) => { e.stopPropagation(); handlePrev(); }} className="p-1.5 text-zinc-500 hover:text-white">
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePrev(); }} className="p-1.5 text-zinc-500 hover:text-white">
               <ChevronLeft className="w-5 h-5 sm:w-[18px] h-[18px]" />
             </button>
             <h2 className={cn(
@@ -1323,7 +1329,7 @@ export default function Calendar({
             )}>
               {format(currentDate, 'MMM yyyy', { locale: es }).replace('.', '')}
             </h2>
-            <button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="p-1.5 text-zinc-500 hover:text-white">
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleNext(); }} className="p-1.5 text-zinc-500 hover:text-white">
               <ChevronRight className="w-5 h-5 sm:w-[18px] h-[18px]" />
             </button>
           </div>
@@ -1653,11 +1659,11 @@ export default function Calendar({
                               <>
                                 <div className="fixed inset-0 z-[105]" onClick={() => setIsStartTimePickerOpen(false)} />
                                 <motion.div
-                                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                  initial={{ opacity: 0, scale: 0.95, x: 20 }}
+                                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, x: 20 }}
                                   className={cn(
-                                    "absolute z-[110] top-full left-0 mt-2 p-4 rounded-2xl border shadow-2xl flex flex-col gap-4 min-w-[200px]",
+                                    "absolute z-[110] right-[105%] top-1/2 -translate-y-1/2 p-4 rounded-2xl border shadow-2xl flex flex-col gap-4 min-w-[200px]",
                                     theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                                   )}
                                 >
@@ -1667,7 +1673,13 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
-                                          setFormTime(`${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          const newH = (h + 1) % 24;
+                                          const newTime = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                          setFormTime(newTime);
+                                          if (!didEditEndTime) {
+                                            const endH = (newH + 1) % 24;
+                                            setFormEndTime(`${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          }
                                           startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
@@ -1679,7 +1691,13 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
-                                          setFormTime(`${String((h - 1 + 24) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          const newH = (h - 1 + 24) % 24;
+                                          const newTime = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                          setFormTime(newTime);
+                                          if (!didEditEndTime) {
+                                            const endH = (newH + 1) % 24;
+                                            setFormEndTime(`${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          }
                                           startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
@@ -1693,7 +1711,12 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
-                                          setFormTime(`${String(h).padStart(2, '0')}:${String((m + 15) % 60).padStart(2, '0')}`);
+                                          const newM = (m + 15) % 60;
+                                          const newTime = `${String(h).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+                                          setFormTime(newTime);
+                                          if (!didEditEndTime) {
+                                            setFormEndTime(`${String((h + (newM === 0 ? 1 : 0)) % 24).padStart(2, '0')}:${String(newM).padStart(2, '0')}`);
+                                          }
                                           startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
@@ -1705,7 +1728,12 @@ export default function Calendar({
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const [h, m] = formTime.split(':').map(Number);
-                                          setFormTime(`${String(h).padStart(2, '0')}:${String((m - 15 + 60) % 60).padStart(2, '0')}`);
+                                          const newM = (m - 15 + 60) % 60;
+                                          const newTime = `${String(h).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+                                          setFormTime(newTime);
+                                          if (!didEditEndTime) {
+                                            setFormEndTime(`${String((h + (newM === 45 ? -1 + 24 : 0)) % 24).padStart(2, '0')}:${String(newM).padStart(2, '0')}`);
+                                          }
                                           startStartTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
@@ -1754,11 +1782,11 @@ export default function Calendar({
                               <>
                                 <div className="fixed inset-0 z-[105]" onClick={() => setIsEndTimePickerOpen(false)} />
                                 <motion.div
-                                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                  initial={{ opacity: 0, scale: 0.95, x: -20 }}
+                                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, x: -20 }}
                                   className={cn(
-                                    "absolute z-[110] top-full right-0 mt-2 p-4 rounded-2xl border shadow-2xl flex flex-col gap-4 min-w-[200px]",
+                                    "absolute z-[110] left-[105%] top-1/2 -translate-y-1/2 p-4 rounded-2xl border shadow-2xl flex flex-col gap-4 min-w-[200px]",
                                     theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                                   )}
                                 >
@@ -1769,6 +1797,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String((h + 1) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          setDidEditEndTime(true);
                                           startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
@@ -1781,6 +1810,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String((h - 1 + 24) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                                          setDidEditEndTime(true);
                                           startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
@@ -1795,6 +1825,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String(h).padStart(2, '0')}:${String((m + 15) % 60).padStart(2, '0')}`);
+                                          setDidEditEndTime(true);
                                           startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"
@@ -1807,6 +1838,7 @@ export default function Calendar({
                                           e.stopPropagation();
                                           const [h, m] = formEndTime.split(':').map(Number);
                                           setFormEndTime(`${String(h).padStart(2, '0')}:${String((m - 15 + 60) % 60).padStart(2, '0')}`);
+                                          setDidEditEndTime(true);
                                           startEndTimePickerTimer();
                                         }}
                                         className="p-1 hover:bg-zinc-800 rounded-lg text-zinc-400"

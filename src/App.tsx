@@ -1399,12 +1399,6 @@ export default function App() {
                 "flex items-center justify-between px-4 py-2 border-b",
                 theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
               )}>
-                  <div className="flex items-center gap-2">
-                    <h2 className={cn(
-                      "text-xs font-bold capitalize",
-                      theme === 'dark' ? "text-white" : "text-black"
-                    )}>Metas</h2>
-                  </div>
                   <div className={cn(
                     "flex items-center gap-1 p-1 rounded-xl",
                     theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
@@ -1458,12 +1452,6 @@ export default function App() {
                   "flex items-center justify-between px-4 py-2 border-b",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
                 )}>
-                  <div className="flex items-center gap-2">
-                    <h2 className={cn(
-                      "text-xs font-bold capitalize",
-                      theme === 'dark' ? "text-white" : "text-black"
-                    )}>Notas</h2>
-                  </div>
                   <div className={cn(
                     "flex items-center gap-1 p-1 rounded-xl",
                     theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
@@ -1563,12 +1551,6 @@ export default function App() {
                   "flex items-center justify-between px-4 py-2 border-b",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
                 )}>
-                  <div className="flex items-center gap-2">
-                    <h2 className={cn(
-                      "text-xs font-bold capitalize",
-                      theme === 'dark' ? "text-white" : "text-black"
-                    )}>Ajustes</h2>
-                  </div>
                   <div className={cn(
                     "flex items-center gap-1 p-1 rounded-xl",
                     theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
@@ -2113,12 +2095,6 @@ export default function App() {
                   "flex items-center justify-between px-4 py-2 border-b",
                   theme === 'dark' ? "border-zinc-900 bg-black" : "border-zinc-200 bg-[#f5f5f0]"
                 )}>
-                  <div className="flex items-center gap-2">
-                    <h2 className={cn(
-                      "text-[15px] font-bold capitalize",
-                      theme === 'dark' ? "text-white" : "text-black"
-                    )}>Inicio</h2>
-                  </div>
                   <div className={cn(
                     "flex items-center gap-1 p-1 rounded-xl",
                     theme === 'dark' ? "bg-zinc-900/50" : "bg-white/50"
@@ -2184,11 +2160,11 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Today's Agenda */}
                       <div className={cn(
-                        "p-5 rounded-2xl border shadow-xl flex flex-col h-[320px]",
+                        "p-5 rounded-2xl border shadow-xl flex flex-col min-h-[200px]",
                         theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                       )}>
                         <h3 className="font-bold text-zinc-500 mb-4 text-[13px] uppercase tracking-widest shrink-0">Agenda de Hoy</h3>
-                        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                        <div className="space-y-4">
                           {allEvents
                             .filter(event => {
                               if (event.category === 'holiday') return false;
@@ -2216,11 +2192,11 @@ export default function App() {
 
                       {/* Active Goals */}
                       <div className={cn(
-                        "p-5 rounded-2xl border shadow-xl flex flex-col h-[320px]",
+                        "p-5 rounded-2xl border shadow-xl flex flex-col min-h-[200px]",
                         theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                       )}>
                         <h3 className="font-bold text-zinc-500 mb-4 text-[13px] uppercase tracking-widest shrink-0">Metas Activas</h3>
-                        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2">
+                        <div className="space-y-4">
                           {goals.filter(g => g.status === 'active').slice(0, 5).map(goal => {
                             const goalEvents = events.filter(e => e.goalId === goal.id);
                             const totalItems = goal.tasks.length + goalEvents.length;
@@ -2250,7 +2226,7 @@ export default function App() {
 
                       {/* Achievements Wall (Full Width on Desktop) */}
                       <div className={cn(
-                        "p-5 rounded-2xl border shadow-xl flex flex-col h-[320px] md:col-span-2 overflow-hidden",
+                        "p-5 rounded-2xl border shadow-xl flex flex-col md:col-span-2 overflow-hidden min-h-[320px]",
                         theme === 'dark' ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                       )}>
                         <h3 className="font-bold text-zinc-500 mb-4 text-[13px] uppercase tracking-widest shrink-0">Muro de Logros</h3>

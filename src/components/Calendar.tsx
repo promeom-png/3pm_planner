@@ -93,7 +93,7 @@ export default function Calendar({
   categories = []
 }: CalendarProps) {
   const [view, setView] = useState<ViewType>('week');
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => startOfDay(new Date()));
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHabitsModalOpen, setIsHabitsModalOpen] = useState(false);
@@ -1400,7 +1400,7 @@ export default function Calendar({
               const { offset, velocity } = info;
               handleSwipe(offset.x, offset.y, velocity.x, velocity.y);
             }}
-            className="h-full w-full absolute inset-0"
+            className="h-full w-full absolute inset-0 touch-none"
           >
             {view === 'month' && renderMonthView()}
             {view === 'week' && renderWeekView()}
